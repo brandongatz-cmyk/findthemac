@@ -34,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger("findthemac")
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "findthemac.db")
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL_MINUTES", "15"))
+CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL_MINUTES", "5"))
 
 # ============================================================================
 # Apple product catalog
