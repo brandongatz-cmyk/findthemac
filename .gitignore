@@ -2,6 +2,6 @@
 __pycache__/
 *.pyc
 *.pyo
-data/products.json
+data/
 venv/
 .venv/
