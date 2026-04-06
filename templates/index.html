@@ -418,6 +418,51 @@
             accent-color: var(--accent);
         }
 
+        .tier-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .tier-option {
+            flex: 1;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            background: var(--card-bg);
+        }
+        .tier-option:hover { border-color: var(--accent); }
+        .tier-option.active {
+            border-color: var(--accent);
+            background: #f0f5ff;
+        }
+        .tier-option.active.paid {
+            border-color: #af52de;
+            background: #faf0ff;
+        }
+        .tier-name {
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 2px;
+        }
+        .tier-option.paid .tier-name { color: #af52de; }
+        .tier-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .tier-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+        .tier-badge.free-badge { background: #e8f5e9; color: var(--green); }
+        .tier-badge.paid-badge { background: #f3e5f5; color: #af52de; }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -568,6 +613,19 @@
             <div class="alert-form" id="alertForm">
                 <h3 id="alertFormTitle">Get notified when it becomes available</h3>
 
+                <div class="tier-selector">
+                    <div class="tier-option active" data-tier="free" id="tierFree">
+                        <div class="tier-name">Free</div>
+                        <div class="tier-desc">Checks every 5 minutes</div>
+                        <span class="tier-badge free-badge">$0</span>
+                    </div>
+                    <div class="tier-option paid" data-tier="paid" id="tierPaid">
+                        <div class="tier-name">Paid</div>
+                        <div class="tier-desc">Checks every 15 seconds</div>
+                        <span class="tier-badge paid-badge">Priority</span>
+                    </div>
+                </div>
+
                 <div class="checkbox-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="notifyEmail" checked>
@@ -612,6 +670,7 @@
     let activeCategory = 'all';
     let searchQuery = '';
     let selectedProduct = null;
+    let selectedTier = 'free';
 
     // DOM refs
     const productGrid = document.getElementById('productGrid');
@@ -745,6 +804,9 @@
         submitAlert.disabled = false;
         submitAlert.textContent = 'Set Alert';
         submitAlert.className = 'btn btn-primary';
+        selectedTier = 'free';
+        document.getElementById('tierFree').classList.add('active');
+        document.getElementById('tierPaid').classList.remove('active');
 
         // Show product info
         modalTitle.textContent = 'Set Up Alert';
@@ -815,6 +877,21 @@
         if (e.key === 'Escape') closeModal();
     });
 
+    // Tier selector
+    const tierFree = document.getElementById('tierFree');
+    const tierPaid = document.getElementById('tierPaid');
+
+    tierFree.addEventListener('click', () => {
+        selectedTier = 'free';
+        tierFree.classList.add('active');
+        tierPaid.classList.remove('active');
+    });
+    tierPaid.addEventListener('click', () => {
+        selectedTier = 'paid';
+        tierPaid.classList.add('active');
+        tierFree.classList.remove('active');
+    });
+
     // Toggle form fields based on checkboxes
     notifyEmail.addEventListener('change', () => {
         emailGroup.style.display = notifyEmail.checked ? 'block' : 'none';
@@ -865,6 +942,7 @@
                     phone: phone,
                     notify_email: wantEmail,
                     notify_sms: wantSms,
+                    tier: selectedTier,
                 }),
             });
 

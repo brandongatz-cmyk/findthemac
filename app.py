@@ -34,7 +34,8 @@ logging.basicConfig(
 logger = logging.getLogger("findthemac")
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "findthemac.db")
-CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL_MINUTES", "5"))
+CHECK_INTERVAL_FREE = int(os.getenv("CHECK_INTERVAL_FREE_MINUTES", "5"))
+CHECK_INTERVAL_PAID = int(os.getenv("CHECK_INTERVAL_PAID_SECONDS", "15"))
 
 # ============================================================================
 # Apple product catalog
@@ -84,6 +85,7 @@ def init_db():
                 phone TEXT,
                 notify_email INTEGER DEFAULT 0,
                 notify_sms INTEGER DEFAULT 0,
+                tier TEXT DEFAULT 'free',
                 created_at TEXT NOT NULL,
                 notified_at TEXT,
                 active INTEGER DEFAULT 1
@@ -301,19 +303,19 @@ def send_sms_notification(to_phone, product_name, refurb_matches):
 # Background monitor
 # ============================================================================
 
-def check_and_notify():
-    """Main check loop: scrape refurbished store, match against active alerts, notify."""
-    logger.info("Running refurbished availability check...")
+def update_refurbished_cache():
+    """Scrape Apple's refurbished store and update the local database cache.
 
+    Returns the list of currently available refurbished products, or None on failure.
+    """
     refurbished = scrape_all_refurbished()
     if not refurbished:
         logger.warning("No refurbished products found — skipping this cycle.")
-        return
+        return None
 
     now = datetime.now(timezone.utc).isoformat()
 
     with get_db_connection() as conn:
-        # Update refurbished products table
         current_parts = set()
         for p in refurbished:
             current_parts.add(p["part_number"])
@@ -333,7 +335,6 @@ def check_and_notify():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """, (p["part_number"], p["title"], p["url"], p["category"], p["price"], p["original_price"], p["savings"], now, now))
 
-        # Mark missing products as unavailable
         conn.execute(
             "UPDATE refurbished_products SET available = 0 WHERE part_number NOT IN ({})".format(
                 ",".join("?" * len(current_parts))
@@ -342,10 +343,22 @@ def check_and_notify():
         )
         conn.commit()
 
-        # Process active alerts
+    return refurbished
+
+
+def process_alerts(tier, refurbished):
+    """Check active alerts for a given tier and send notifications for matches."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_db_connection() as conn:
         alerts = conn.execute(
-            "SELECT * FROM alerts WHERE active = 1"
+            "SELECT * FROM alerts WHERE active = 1 AND tier = ?", (tier,)
         ).fetchall()
+
+        if not alerts:
+            return
+
+        logger.info("Processing %d active '%s' tier alert(s)", len(alerts), tier)
 
         for alert in alerts:
             product = get_product_by_id(alert["product_id"])
@@ -356,8 +369,7 @@ def check_and_notify():
             if not matches:
                 continue
 
-            # Found matches — notify!
-            logger.info("Product '%s' has %d refurbished match(es)", product["name"], len(matches))
+            logger.info("Product '%s' has %d refurbished match(es) [%s tier]", product["name"], len(matches), tier)
 
             sent = False
             if alert["notify_email"] and alert["email"]:
@@ -373,19 +385,35 @@ def check_and_notify():
 
         conn.commit()
 
-    logger.info("Check complete.")
-
 
 def background_monitor():
-    """Background thread that periodically checks for refurbished products."""
-    # Wait a bit before first check to let the app start up
-    time.sleep(10)
+    """Background thread running two check cadences:
+
+    - Paid tier: scrape + notify every 15 seconds
+    - Free tier: notify every 5 minutes (reuses the latest scrape data)
+    """
+    time.sleep(10)  # Let the app start up
+
+    free_interval = CHECK_INTERVAL_FREE * 60  # seconds
+    paid_interval = CHECK_INTERVAL_PAID        # already in seconds
+    time_since_free_check = free_interval       # run free immediately on first pass
+
     while True:
         try:
-            check_and_notify()
+            refurbished = update_refurbished_cache()
+            if refurbished:
+                # Always process paid-tier alerts every cycle (15s)
+                process_alerts("paid", refurbished)
+
+                # Process free-tier alerts only every 5 minutes
+                time_since_free_check += paid_interval
+                if time_since_free_check >= free_interval:
+                    process_alerts("free", refurbished)
+                    time_since_free_check = 0
         except Exception as exc:
             logger.error("Monitor error: %s", exc)
-        time.sleep(CHECK_INTERVAL * 60)
+
+        time.sleep(paid_interval)
 
 
 # ============================================================================
@@ -439,11 +467,14 @@ def api_create_alert():
     phone = data.get("phone", "").strip()
     notify_email = bool(data.get("notify_email", False))
     notify_sms = bool(data.get("notify_sms", False))
+    tier = data.get("tier", "free").strip().lower()
 
     # Validation
     product = get_product_by_id(product_id)
     if not product:
         return jsonify({"error": "Invalid product"}), 400
+    if tier not in ("free", "paid"):
+        return jsonify({"error": "Invalid tier. Must be 'free' or 'paid'."}), 400
     if not notify_email and not notify_sms:
         return jsonify({"error": "Select at least one notification method"}), 400
     if notify_email and not email:
@@ -467,9 +498,9 @@ def api_create_alert():
     if matches:
         # Product is available NOW — notify immediately and create a completed alert
         db.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, created_at, notified_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), now, now))
+            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, notified_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, now, now))
         db.commit()
 
         # Send immediate notifications in background
@@ -491,9 +522,9 @@ def api_create_alert():
     else:
         # Product not available — create active alert
         db.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, created_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), now))
+            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, now))
         db.commit()
 
         return jsonify({
