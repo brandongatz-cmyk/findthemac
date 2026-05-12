@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-FindTheMac — Apple Refurbished Product Alert Web Application.
+FindTheMac — Apple Product Availability Alert Web Application.
 
 A single-page web app that lets users browse Apple products and set up
-email/SMS alerts for when those products appear on Apple's refurbished store.
+email/SMS alerts for when those products become available on the Apple Store
+(both new and refurbished).
 """
 
 import json
@@ -18,6 +19,9 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import quote_plus
 
 import requests
 from dotenv import load_dotenv
@@ -64,7 +68,6 @@ def close_db(exception):
 
 @contextmanager
 def get_db_connection():
-    """Context manager for use outside Flask request context."""
     os.makedirs(os.path.dirname(DATABASE), exist_ok=True)
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
@@ -86,6 +89,8 @@ def init_db():
                 notify_email INTEGER DEFAULT 0,
                 notify_sms INTEGER DEFAULT 0,
                 tier TEXT DEFAULT 'free',
+                check_new INTEGER DEFAULT 1,
+                check_refurbished INTEGER DEFAULT 1,
                 created_at TEXT NOT NULL,
                 notified_at TEXT,
                 active INTEGER DEFAULT 1
@@ -104,12 +109,53 @@ def init_db():
                 available INTEGER DEFAULT 1
             );
 
+            CREATE TABLE IF NOT EXISTS new_products (
+                part_number TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                url TEXT,
+                category TEXT,
+                price TEXT,
+                buyable INTEGER DEFAULT 0,
+                first_seen TEXT,
+                last_seen TEXT
+            );
+
             CREATE INDEX IF NOT EXISTS idx_alerts_product ON alerts(product_id);
             CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(active);
             CREATE INDEX IF NOT EXISTS idx_refurb_category ON refurbished_products(category);
+            CREATE INDEX IF NOT EXISTS idx_new_category ON new_products(category);
+            CREATE INDEX IF NOT EXISTS idx_new_buyable ON new_products(buyable);
+
+            CREATE TABLE IF NOT EXISTS retailer_cache (
+                cache_key TEXT PRIMARY KEY,
+                retailer TEXT NOT NULL,
+                product_id TEXT NOT NULL,
+                data TEXT NOT NULL,
+                fetched_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_retailer_cache_product ON retailer_cache(product_id);
         """)
+        # Migration for existing databases
+        for col, default in [("check_new", "1"), ("check_refurbished", "1")]:
+            try:
+                conn.execute(f"ALTER TABLE alerts ADD COLUMN {col} INTEGER DEFAULT {default}")
+            except sqlite3.OperationalError:
+                pass
         conn.commit()
 
+
+# ============================================================================
+# Shared HTTP headers
+# ============================================================================
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 # ============================================================================
 # Apple Refurbished Scraper
@@ -117,14 +163,6 @@ def init_db():
 
 REFURB_BASE = "https://www.apple.com/shop/refurbished"
 REFURB_CATEGORIES = ["mac", "ipad", "iphone", "watch", "airpods", "appletv", "homepod"]
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml",
-    "Accept-Language": "en-US,en;q=0.9",
-}
 BOOTSTRAP_RE = re.compile(
     r"window\.REFURB_GRID_BOOTSTRAP\s*=\s*(\{.*?\});\s*$",
     re.MULTILINE | re.DOTALL,
@@ -132,7 +170,6 @@ BOOTSTRAP_RE = re.compile(
 
 
 def scrape_refurbished_category(category):
-    """Scrape a single refurbished category page and return product list."""
     url = f"{REFURB_BASE}/{category}"
     try:
         resp = requests.get(url, headers=HEADERS, timeout=30)
@@ -162,28 +199,417 @@ def scrape_refurbished_category(category):
 
 
 def scrape_all_refurbished():
-    """Scrape all refurbished categories and return combined product list."""
     all_products = []
     for cat in REFURB_CATEGORIES:
         products = scrape_refurbished_category(cat)
         all_products.extend(products)
-        time.sleep(1)  # Be polite
+        time.sleep(1)
     logger.info("Scraped %d refurbished products total", len(all_products))
     return all_products
 
 
 # ============================================================================
-# Product matching — match catalog products to refurbished listings
+# Apple New Product Store Checker
+# ============================================================================
+
+BUY_PAGES = {
+    "mac": [
+        {"url": "https://www.apple.com/shop/buy-mac/macbook-air", "label": "MacBook Air"},
+        {"url": "https://www.apple.com/shop/buy-mac/macbook-pro", "label": "MacBook Pro"},
+        {"url": "https://www.apple.com/shop/buy-mac/imac", "label": "iMac"},
+        {"url": "https://www.apple.com/shop/buy-mac/mac-mini", "label": "Mac mini"},
+        {"url": "https://www.apple.com/shop/buy-mac/mac-studio", "label": "Mac Studio"},
+        {"url": "https://www.apple.com/shop/buy-mac/mac-pro", "label": "Mac Pro"},
+    ],
+    "ipad": [
+        {"url": "https://www.apple.com/shop/buy-ipad", "label": "iPad"},
+        {"url": "https://www.apple.com/shop/buy-ipad/ipad-mini", "label": "iPad mini"},
+        {"url": "https://www.apple.com/shop/buy-ipad/ipad-air", "label": "iPad Air"},
+        {"url": "https://www.apple.com/shop/buy-ipad/ipad-pro", "label": "iPad Pro"},
+    ],
+    "iphone": [
+        {"url": "https://www.apple.com/shop/buy-iphone", "label": "iPhone"},
+    ],
+    "watch": [
+        {"url": "https://www.apple.com/shop/buy-watch", "label": "Apple Watch"},
+    ],
+    "airpods": [
+        {"url": "https://www.apple.com/shop/buy-airpods", "label": "AirPods"},
+    ],
+    "appletv": [
+        {"url": "https://www.apple.com/shop/buy-tv/apple-tv-4k", "label": "Apple TV"},
+    ],
+    "homepod": [
+        {"url": "https://www.apple.com/shop/buy-homepod", "label": "HomePod"},
+    ],
+}
+
+PART_NUMBER_RE = re.compile(r"[A-Z][A-Z0-9]{2,5}LL/A")
+
+
+def scrape_buy_page(url, category, label):
+    """Scrape an Apple buy page for part numbers and product info."""
+    products = []
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        html = resp.text
+
+        part_numbers = set(PART_NUMBER_RE.findall(html))
+
+        page_title = label
+        title_match = re.search(r"<title[^>]*>([^<]+)</title>", html)
+        if title_match:
+            clean = title_match.group(1).strip().replace("Buy ", "").replace(" - Apple", "").strip()
+            if clean:
+                page_title = clean
+
+        for pn in part_numbers:
+            products.append({
+                "part_number": pn,
+                "title": page_title,
+                "url": url,
+                "category": category,
+            })
+
+    except Exception as exc:
+        logger.error("Failed to scrape buy page %s: %s", url, exc)
+
+    return products
+
+
+def check_buyability(part_numbers):
+    """Check which part numbers are currently buyable via Apple's API."""
+    results = {}
+    pn_list = list(part_numbers)
+    batch_size = 5
+
+    for i in range(0, len(pn_list), batch_size):
+        batch = pn_list[i:i + batch_size]
+        params = {f"parts.{j}": pn for j, pn in enumerate(batch)}
+
+        try:
+            resp = requests.get(
+                "https://www.apple.com/shop/buyability-message",
+                params=params,
+                headers={**HEADERS, "Accept": "application/json"},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                body = data.get("body", {})
+                content = body.get("content", {})
+                for pn in batch:
+                    pn_data = content.get(pn, {})
+                    results[pn] = pn_data.get("isBuyable", False)
+            else:
+                for pn in batch:
+                    results[pn] = False
+        except Exception as exc:
+            logger.error("Buyability check failed: %s", exc)
+            for pn in batch:
+                results[pn] = False
+
+        time.sleep(0.5)
+
+    return results
+
+
+def update_new_products_cache():
+    """Scrape Apple Store buy pages and check availability of new products."""
+    all_products = []
+
+    for category, pages in BUY_PAGES.items():
+        for page in pages:
+            products = scrape_buy_page(page["url"], category, page["label"])
+            all_products.extend(products)
+            time.sleep(1)
+
+    if not all_products:
+        logger.warning("No new product part numbers found — skipping cache update.")
+        return None
+
+    part_numbers = [p["part_number"] for p in all_products]
+    buyability = check_buyability(part_numbers)
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    with get_db_connection() as conn:
+        conn.execute("UPDATE new_products SET buyable = 0")
+
+        for p in all_products:
+            pn = p["part_number"]
+            is_buyable = buyability.get(pn, False)
+            existing = conn.execute(
+                "SELECT part_number FROM new_products WHERE part_number = ?", (pn,)
+            ).fetchone()
+
+            if existing:
+                conn.execute("""
+                    UPDATE new_products SET title=?, url=?, buyable=?, last_seen=?
+                    WHERE part_number=?
+                """, (p["title"], p["url"], int(is_buyable), now, pn))
+            else:
+                conn.execute("""
+                    INSERT INTO new_products (part_number, title, url, category, buyable, first_seen, last_seen)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (pn, p["title"], p["url"], p["category"], int(is_buyable), now, now))
+
+        conn.commit()
+
+    buyable_count = sum(1 for v in buyability.values() if v)
+    logger.info("Updated %d new products (%d buyable)", len(all_products), buyable_count)
+    return all_products
+
+
+# ============================================================================
+# Third-Party Retailer Search (Best Buy, B&H Photo, Swappa)
+# ============================================================================
+
+RETAILER_CACHE_TTL = 300  # 5 minutes
+
+
+def build_search_query(product, memory=None):
+    """Build a search query string from product keywords and optional memory filter."""
+    keywords = product.get("keywords", [])
+    query = " ".join(keywords)
+    if memory:
+        query += f" {memory}GB"
+    return query
+
+
+def search_bestbuy(query):
+    """Search Best Buy for products matching the query."""
+    search_url = f"https://www.bestbuy.com/site/searchpage.jsp?st={quote_plus(query)}"
+    try:
+        resp = requests.get(search_url, headers={
+            **HEADERS,
+            "Accept": "text/html,application/xhtml+xml",
+        }, timeout=15)
+        if resp.status_code != 200:
+            return {"search_url": search_url, "listings": []}
+
+        products = []
+
+        # Try to extract product data from Best Buy's embedded JSON or HTML
+        # Best Buy embeds product data in script tags
+        sku_title_re = re.compile(
+            r'class="sku-title"[^>]*>\s*<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
+            re.DOTALL,
+        )
+        price_re = re.compile(r'"currentPrice":([\d.]+)')
+
+        titles = sku_title_re.findall(resp.text)
+        prices = price_re.findall(resp.text)
+
+        for i, (url, title) in enumerate(titles[:10]):
+            clean_title = re.sub(r"<[^>]+>", "", title).strip()
+            price = prices[i] if i < len(prices) else ""
+            if clean_title and "apple" in clean_title.lower():
+                full_url = "https://www.bestbuy.com" + url if url.startswith("/") else url
+                products.append({
+                    "title": clean_title,
+                    "price": price,
+                    "url": full_url,
+                    "condition": "new",
+                })
+
+        return {"search_url": search_url, "listings": products[:10]}
+    except Exception as exc:
+        logger.error("Best Buy search failed for '%s': %s", query, exc)
+        return {"search_url": search_url, "listings": []}
+
+
+def search_bh(query):
+    """Search B&H Photo for products matching the query."""
+    search_url = f"https://www.bhphotovideo.com/c/search?q={quote_plus(query)}&filters=fct_brand_name%3Aapple"
+    try:
+        resp = requests.get(search_url, headers={
+            **HEADERS,
+            "Accept": "text/html,application/xhtml+xml",
+        }, timeout=15)
+        if resp.status_code != 200:
+            return {"search_url": search_url, "listings": []}
+
+        products = []
+
+        # B&H Photo: try JSON-LD structured data first
+        ld_re = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.DOTALL)
+        for m in ld_re.finditer(resp.text):
+            try:
+                ld_data = json.loads(m.group(1))
+                items = ld_data if isinstance(ld_data, list) else [ld_data]
+                for item in items:
+                    if item.get("@type") in ("Product", "IndividualProduct"):
+                        offers = item.get("offers", {})
+                        if isinstance(offers, list):
+                            offers = offers[0] if offers else {}
+                        products.append({
+                            "title": item.get("name", ""),
+                            "price": str(offers.get("price", "")),
+                            "url": item.get("url", search_url),
+                            "condition": "new",
+                        })
+            except (json.JSONDecodeError, TypeError, IndexError):
+                pass
+
+        # Fallback: regex for product tiles
+        if not products:
+            tile_re = re.compile(
+                r'data-selenium="miniProductPage[^"]*Name"[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>.*?'
+                r'data-selenium="miniProductPage[^"]*Price"[^>]*>\$?([\d,]+\.?\d*)',
+                re.DOTALL,
+            )
+            for match in tile_re.finditer(resp.text):
+                url, title, price = match.groups()
+                clean_title = re.sub(r"<[^>]+>", "", title).strip()
+                if clean_title:
+                    full_url = "https://www.bhphotovideo.com" + url if url.startswith("/") else url
+                    products.append({
+                        "title": clean_title,
+                        "price": price.replace(",", ""),
+                        "url": full_url,
+                        "condition": "new",
+                    })
+
+        return {"search_url": search_url, "listings": products[:10]}
+    except Exception as exc:
+        logger.error("B&H search failed for '%s': %s", query, exc)
+        return {"search_url": search_url, "listings": []}
+
+
+def search_swappa(query):
+    """Search Swappa for used/refurbished products matching the query."""
+    search_url = f"https://swappa.com/search?q={quote_plus(query)}"
+    try:
+        resp = requests.get(search_url, headers={
+            **HEADERS,
+            "Accept": "text/html,application/xhtml+xml",
+        }, timeout=15)
+        if resp.status_code != 200:
+            return {"search_url": search_url, "listings": []}
+
+        products = []
+
+        # Swappa: try to extract listing data from server-rendered HTML
+        # Look for product cards with title, price, and link
+        listing_re = re.compile(
+            r'<a[^>]*href="(/listing/[^"]*)"[^>]*>.*?'
+            r'<(?:h[2-6]|div|span)[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)</(?:h[2-6]|div|span)>.*?'
+            r'\$\s*([\d,]+\.?\d*)',
+            re.DOTALL,
+        )
+        for match in listing_re.finditer(resp.text):
+            url, title, price = match.groups()
+            clean_title = re.sub(r"<[^>]+>", "", title).strip()
+            if clean_title:
+                products.append({
+                    "title": clean_title,
+                    "price": price.replace(",", ""),
+                    "url": "https://swappa.com" + url,
+                    "condition": "used",
+                })
+
+        # Also try JSON-LD
+        if not products:
+            ld_re = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.DOTALL)
+            for m in ld_re.finditer(resp.text):
+                try:
+                    ld_data = json.loads(m.group(1))
+                    items = ld_data if isinstance(ld_data, list) else [ld_data]
+                    for item in items:
+                        if item.get("@type") in ("Product", "IndividualProduct", "Offer"):
+                            offers = item.get("offers", {})
+                            if isinstance(offers, list):
+                                offers = offers[0] if offers else {}
+                            products.append({
+                                "title": item.get("name", ""),
+                                "price": str(offers.get("price", "")),
+                                "url": item.get("url", search_url),
+                                "condition": "used",
+                            })
+                except (json.JSONDecodeError, TypeError, IndexError):
+                    pass
+
+        return {"search_url": search_url, "listings": products[:10]}
+    except Exception as exc:
+        logger.error("Swappa search failed for '%s': %s", query, exc)
+        return {"search_url": search_url, "listings": []}
+
+
+def get_cached_retailer(product_id, retailer):
+    """Get cached retailer results if still fresh."""
+    try:
+        with get_db_connection() as conn:
+            row = conn.execute(
+                "SELECT data, fetched_at FROM retailer_cache WHERE cache_key = ?",
+                (f"{retailer}:{product_id}",),
+            ).fetchone()
+            if row:
+                fetched = datetime.fromisoformat(row["fetched_at"])
+                age = (datetime.now(timezone.utc) - fetched).total_seconds()
+                if age < RETAILER_CACHE_TTL:
+                    return json.loads(row["data"])
+    except Exception:
+        pass
+    return None
+
+
+def cache_retailer_result(product_id, retailer, data):
+    """Cache retailer search results."""
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        with get_db_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO retailer_cache (cache_key, retailer, product_id, data, fetched_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (f"{retailer}:{product_id}", retailer, product_id, json.dumps(data), now))
+            conn.commit()
+    except Exception as exc:
+        logger.error("Failed to cache retailer result: %s", exc)
+
+
+def search_all_retailers(product, memory=None):
+    """Search all third-party retailers for a product. Returns dict of results."""
+    query = build_search_query(product, memory)
+    product_id = product["id"]
+    cache_suffix = f":{memory}" if memory else ""
+
+    results = {}
+    retailers = {
+        "bestbuy": search_bestbuy,
+        "bh": search_bh,
+        "swappa": search_swappa,
+    }
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {}
+        for name, fn in retailers.items():
+            cached = get_cached_retailer(product_id + cache_suffix, name)
+            if cached:
+                results[name] = cached
+            else:
+                futures[executor.submit(fn, query)] = name
+
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                result = future.result()
+                results[name] = result
+                cache_retailer_result(product_id + cache_suffix, name, result)
+            except Exception as exc:
+                logger.error("Retailer %s search failed: %s", name, exc)
+                results[name] = {"search_url": "", "listings": []}
+
+    return results
+
+
+# ============================================================================
+# Product matching
 # ============================================================================
 
 def match_product_to_refurbished(product, refurbished_list):
-    """Check if a catalog product has matching items in the refurbished store.
-
-    Uses keyword matching: all keywords from the catalog product must appear
-    in the refurbished listing title (case-insensitive).
-
-    Returns list of matching refurbished products.
-    """
+    """Match a catalog product to refurbished listings using keyword matching."""
     matches = []
     keywords = product.get("keywords", [])
     if not keywords:
@@ -197,12 +623,31 @@ def match_product_to_refurbished(product, refurbished_list):
     return matches
 
 
+def match_product_to_new(product, new_products_list):
+    """Match a catalog product to new Apple Store listings.
+
+    Matches based on product subcategory against the buy page label.
+    """
+    matches = []
+    subcategory = product.get("subcategory", "").lower()
+    if not subcategory:
+        return matches
+
+    for item in new_products_list:
+        item_label = item["title"].lower() if isinstance(item, dict) else item[1].lower()
+        title = item_label
+        if subcategory == title or subcategory.startswith(title) or title.startswith(subcategory):
+            matches.append(item)
+
+    return matches
+
+
 # ============================================================================
 # Notifications
 # ============================================================================
 
-def send_email_notification(to_email, product_name, refurb_matches):
-    """Send an email alert about available refurbished products."""
+def send_email_notification(to_email, product_name, refurb_matches, new_matches):
+    """Send an email alert about available products (new and/or refurbished)."""
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USERNAME", "")
@@ -213,21 +658,63 @@ def send_email_notification(to_email, product_name, refurb_matches):
         logger.warning("SMTP not configured, skipping email to %s", to_email)
         return False
 
-    subject = f"FindTheMac Alert: {product_name} is available refurbished!"
+    avail_types = []
+    if new_matches:
+        avail_types.append("new")
+    if refurb_matches:
+        avail_types.append("refurbished")
+    avail_label = " & ".join(avail_types)
 
-    # Build HTML
-    rows = ""
-    for m in refurb_matches[:10]:
-        rows += f"""<tr>
-            <td style="padding:10px;border-bottom:1px solid #eee;">
-                <a href="{m['url']}" style="color:#0071e3;text-decoration:none;font-weight:600;">{m['title']}</a>
-            </td>
-            <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">
-                <strong>${m['price']}</strong><br>
-                <span style="color:#86868b;text-decoration:line-through;font-size:0.85em;">${m['original_price']}</span><br>
-                <span style="color:#2d8a2d;font-size:0.85em;">{m['savings']}</span>
-            </td>
-        </tr>"""
+    subject = f"FindTheMac Alert: {product_name} is available {avail_label}!"
+
+    # Build HTML sections
+    new_section = ""
+    if new_matches:
+        seen_urls = set()
+        unique_new = []
+        for m in new_matches:
+            url = m["url"] if isinstance(m, dict) else m[2]
+            if url not in seen_urls:
+                seen_urls.add(url)
+                unique_new.append(m)
+
+        new_rows = ""
+        for m in unique_new[:5]:
+            title = m["title"] if isinstance(m, dict) else m[1]
+            url = m["url"] if isinstance(m, dict) else m[2]
+            new_rows += f"""<tr>
+                <td style="padding:10px;border-bottom:1px solid #d0e4f5;">
+                    <a href="{url}" style="color:#0071e3;text-decoration:none;font-weight:600;">{title}</a>
+                </td>
+                <td style="padding:10px;border-bottom:1px solid #d0e4f5;text-align:right;">
+                    <span style="color:#0071e3;font-weight:600;">Buy New</span>
+                </td>
+            </tr>"""
+        new_section = f"""
+        <div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:12px;padding:16px;margin-bottom:20px;">
+            <h3 style="color:#1565c0;margin:0 0 10px;font-size:16px;">Available NEW on Apple.com</h3>
+            <table style="width:100%;border-collapse:collapse;">{new_rows}</table>
+        </div>"""
+
+    refurb_section = ""
+    if refurb_matches:
+        refurb_rows = ""
+        for m in refurb_matches[:10]:
+            refurb_rows += f"""<tr>
+                <td style="padding:10px;border-bottom:1px solid #c8e6c9;">
+                    <a href="{m['url']}" style="color:#0071e3;text-decoration:none;font-weight:600;">{m['title']}</a>
+                </td>
+                <td style="padding:10px;border-bottom:1px solid #c8e6c9;text-align:right;">
+                    <strong>${m['price']}</strong><br>
+                    <span style="color:#86868b;text-decoration:line-through;font-size:0.85em;">${m['original_price']}</span><br>
+                    <span style="color:#2d8a2d;font-size:0.85em;">{m['savings']}</span>
+                </td>
+            </tr>"""
+        refurb_section = f"""
+        <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:12px;padding:16px;margin-bottom:20px;">
+            <h3 style="color:#2d8a2d;margin:0 0 10px;font-size:16px;">Available on Apple Refurbished ({len(refurb_matches)} listing{'s' if len(refurb_matches) != 1 else ''})</h3>
+            <table style="width:100%;border-collapse:collapse;">{refurb_rows}</table>
+        </div>"""
 
     html = f"""
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;">
@@ -235,24 +722,37 @@ def send_email_notification(to_email, product_name, refurb_matches):
             <h1 style="color:#1d1d1f;margin:0;font-size:22px;">FindTheMac</h1>
         </div>
         <div style="padding:24px;background:white;border:1px solid #e5e5e5;">
-            <h2 style="color:#1d1d1f;font-size:18px;">Good news! {product_name} is available on Apple Refurbished.</h2>
-            <p style="color:#86868b;">We found {len(refurb_matches)} matching listing(s):</p>
-            <table style="width:100%;border-collapse:collapse;">{rows}</table>
+            <h2 style="color:#1d1d1f;font-size:18px;">Good news! {product_name} is available.</h2>
+            {new_section}
+            {refurb_section}
             <p style="margin-top:20px;">
-                <a href="https://www.apple.com/shop/refurbished" style="background:#0071e3;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
-                    Shop Apple Refurbished
+                <a href="https://www.apple.com/shop" style="background:#0071e3;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
+                    Shop Apple Store
                 </a>
             </p>
         </div>
         <div style="padding:16px;text-align:center;background:#f5f5f7;border-radius:0 0 12px 12px;">
-            <p style="color:#86868b;font-size:12px;margin:0;">Sent by FindTheMac — Apple Refurbished Product Monitor</p>
+            <p style="color:#86868b;font-size:12px;margin:0;">Sent by FindTheMac — Apple Product Availability Monitor</p>
         </div>
     </div>"""
 
-    text = f"FindTheMac Alert: {product_name} is available refurbished!\n\n"
-    for m in refurb_matches[:10]:
-        text += f"- {m['title']} — ${m['price']} (was ${m['original_price']})\n  {m['url']}\n\n"
-    text += "Shop: https://www.apple.com/shop/refurbished\n"
+    text = f"FindTheMac Alert: {product_name} is available!\n\n"
+    if new_matches:
+        text += "AVAILABLE NEW:\n"
+        seen = set()
+        for m in new_matches[:5]:
+            url = m["url"] if isinstance(m, dict) else m[2]
+            title = m["title"] if isinstance(m, dict) else m[1]
+            if url not in seen:
+                seen.add(url)
+                text += f"- {title}: {url}\n"
+        text += "\n"
+    if refurb_matches:
+        text += "AVAILABLE REFURBISHED:\n"
+        for m in refurb_matches[:10]:
+            text += f"- {m['title']} — ${m['price']} (was ${m['original_price']})\n  {m['url']}\n"
+        text += "\n"
+    text += "Shop: https://www.apple.com/shop\n"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -273,7 +773,7 @@ def send_email_notification(to_email, product_name, refurb_matches):
         return False
 
 
-def send_sms_notification(to_phone, product_name, refurb_matches):
+def send_sms_notification(to_phone, product_name, refurb_matches, new_matches):
     """Send an SMS alert via Twilio."""
     sid = os.getenv("TWILIO_ACCOUNT_SID", "")
     token = os.getenv("TWILIO_AUTH_TOKEN", "")
@@ -283,10 +783,14 @@ def send_sms_notification(to_phone, product_name, refurb_matches):
         logger.warning("Twilio not configured, skipping SMS to %s", to_phone)
         return False
 
-    body = f"FindTheMac: {product_name} is now on Apple Refurbished!\n"
-    for m in refurb_matches[:2]:
-        body += f"\n${m['price']} - {m['title'][:50]}"
-    body += f"\n\n{len(refurb_matches)} listing(s) at apple.com/shop/refurbished"
+    body = f"FindTheMac: {product_name} is now available!\n"
+    if new_matches:
+        body += f"\nNEW: Available on Apple.com"
+    if refurb_matches:
+        body += f"\nREFURBISHED: {len(refurb_matches)} listing(s)"
+        for m in refurb_matches[:2]:
+            body += f"\n${m['price']} - {m['title'][:50]}"
+    body += "\n\napple.com/shop"
 
     try:
         from twilio.rest import Client
@@ -304,10 +808,6 @@ def send_sms_notification(to_phone, product_name, refurb_matches):
 # ============================================================================
 
 def update_refurbished_cache():
-    """Scrape Apple's refurbished store and update the local database cache.
-
-    Returns the list of currently available refurbished products, or None on failure.
-    """
     refurbished = scrape_all_refurbished()
     if not refurbished:
         logger.warning("No refurbished products found — skipping this cycle.")
@@ -335,18 +835,19 @@ def update_refurbished_cache():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 """, (p["part_number"], p["title"], p["url"], p["category"], p["price"], p["original_price"], p["savings"], now, now))
 
-        conn.execute(
-            "UPDATE refurbished_products SET available = 0 WHERE part_number NOT IN ({})".format(
-                ",".join("?" * len(current_parts))
-            ),
-            list(current_parts),
-        )
+        if current_parts:
+            conn.execute(
+                "UPDATE refurbished_products SET available = 0 WHERE part_number NOT IN ({})".format(
+                    ",".join("?" * len(current_parts))
+                ),
+                list(current_parts),
+            )
         conn.commit()
 
     return refurbished
 
 
-def process_alerts(tier, refurbished):
+def process_alerts(tier, refurbished, new_products):
     """Check active alerts for a given tier and send notifications for matches."""
     now = datetime.now(timezone.utc).isoformat()
 
@@ -365,17 +866,22 @@ def process_alerts(tier, refurbished):
             if not product:
                 continue
 
-            matches = match_product_to_refurbished(product, refurbished)
-            if not matches:
+            refurb_matches = match_product_to_refurbished(product, refurbished) if refurbished else []
+            new_matches = match_product_to_new(product, new_products) if new_products else []
+
+            if not refurb_matches and not new_matches:
                 continue
 
-            logger.info("Product '%s' has %d refurbished match(es) [%s tier]", product["name"], len(matches), tier)
+            logger.info(
+                "Product '%s' has %d new + %d refurbished match(es) [%s tier]",
+                product["name"], len(new_matches), len(refurb_matches), tier,
+            )
 
             sent = False
             if alert["notify_email"] and alert["email"]:
-                sent = send_email_notification(alert["email"], product["name"], matches) or sent
+                sent = send_email_notification(alert["email"], product["name"], refurb_matches, new_matches) or sent
             if alert["notify_sms"] and alert["phone"]:
-                sent = send_sms_notification(alert["phone"], product["name"], matches) or sent
+                sent = send_sms_notification(alert["phone"], product["name"], refurb_matches, new_matches) or sent
 
             if sent:
                 conn.execute(
@@ -387,28 +893,39 @@ def process_alerts(tier, refurbished):
 
 
 def background_monitor():
-    """Background thread running two check cadences:
+    """Background thread: paid tier every 15s, free tier every 5 min, new products every 5 min."""
+    time.sleep(10)
 
-    - Paid tier: scrape + notify every 15 seconds
-    - Free tier: notify every 5 minutes (reuses the latest scrape data)
-    """
-    time.sleep(10)  # Let the app start up
-
-    free_interval = CHECK_INTERVAL_FREE * 60  # seconds
-    paid_interval = CHECK_INTERVAL_PAID        # already in seconds
-    time_since_free_check = free_interval       # run free immediately on first pass
+    free_interval = CHECK_INTERVAL_FREE * 60
+    paid_interval = CHECK_INTERVAL_PAID
+    new_products_interval = 300  # 5 minutes
+    time_since_free_check = free_interval
+    time_since_new_check = new_products_interval
 
     while True:
         try:
-            refurbished = update_refurbished_cache()
-            if refurbished:
-                # Always process paid-tier alerts every cycle (15s)
-                process_alerts("paid", refurbished)
+            # Update new products cache every 5 minutes
+            time_since_new_check += paid_interval
+            if time_since_new_check >= new_products_interval:
+                update_new_products_cache()
+                time_since_new_check = 0
 
-                # Process free-tier alerts only every 5 minutes
+            # Update refurbished cache every cycle
+            refurbished = update_refurbished_cache()
+
+            # Load current new products from DB
+            with get_db_connection() as conn:
+                new_rows = conn.execute(
+                    "SELECT * FROM new_products WHERE buyable = 1"
+                ).fetchall()
+                new_products = [dict(r) for r in new_rows]
+
+            if refurbished or new_products:
+                process_alerts("paid", refurbished or [], new_products)
+
                 time_since_free_check += paid_interval
                 if time_since_free_check >= free_interval:
-                    process_alerts("free", refurbished)
+                    process_alerts("free", refurbished or [], new_products)
                     time_since_free_check = 0
         except Exception as exc:
             logger.error("Monitor error: %s", exc)
@@ -427,37 +944,126 @@ def index():
 
 @app.route("/api/products")
 def api_products():
-    """Return the full product catalog."""
     return jsonify({"products": PRODUCTS, "categories": CATEGORIES})
 
 
-@app.route("/api/refurbished/status/<product_id>")
-def api_refurbished_status(product_id):
-    """Check if a product currently has refurbished listings."""
+@app.route("/api/availability/<product_id>")
+def api_availability(product_id):
+    """Check if a product is currently available across all sources."""
     product = get_product_by_id(product_id)
     if not product:
         return jsonify({"error": "Product not found"}), 404
 
+    memory = request.args.get("memory", "").strip()
+
     db = get_db()
-    # Get all available refurbished products in this category
+
+    # Check refurbished
     refurbished = db.execute(
         "SELECT * FROM refurbished_products WHERE category = ? AND available = 1",
         (product["category"],),
     ).fetchall()
+    refurb_matches = match_product_to_refurbished(product, [dict(r) for r in refurbished])
+    if memory:
+        refurb_matches = [m for m in refurb_matches if memory.lower() + "gb" in m["title"].lower() or memory + " gb" in m["title"].lower()]
 
-    matches = match_product_to_refurbished(product, [dict(r) for r in refurbished])
+    # Check new
+    new_rows = db.execute(
+        "SELECT * FROM new_products WHERE category = ? AND buyable = 1",
+        (product["category"],),
+    ).fetchall()
+    new_matches = match_product_to_new(product, [dict(r) for r in new_rows])
+
+    seen_urls = set()
+    unique_new = []
+    for m in new_matches:
+        if m["url"] not in seen_urls:
+            seen_urls.add(m["url"])
+            unique_new.append(m)
+
+    # Search third-party retailers (parallel, cached)
+    retailer_results = search_all_retailers(product, memory=memory or None)
+
+    response = {
+        "product_id": product_id,
+        "new": {
+            "available": len(unique_new) > 0,
+            "count": len(unique_new),
+            "listings": [dict(m) for m in unique_new[:10]],
+        },
+        "refurbished": {
+            "available": len(refurb_matches) > 0,
+            "count": len(refurb_matches),
+            "listings": [dict(m) for m in refurb_matches[:20]],
+        },
+    }
+
+    for retailer_name, data in retailer_results.items():
+        listings = data.get("listings", [])
+        response[retailer_name] = {
+            "available": len(listings) > 0,
+            "count": len(listings),
+            "listings": listings[:10],
+            "search_url": data.get("search_url", ""),
+        }
+
+    return jsonify(response)
+
+
+@app.route("/api/inventory/summary")
+def api_inventory_summary():
+    """Summary of currently available products (new and refurbished)."""
+    db = get_db()
+
+    refurb_rows = db.execute("""
+        SELECT category, COUNT(*) as count
+        FROM refurbished_products
+        WHERE available = 1
+        GROUP BY category
+    """).fetchall()
+    refurb_summary = {r["category"]: r["count"] for r in refurb_rows}
+    refurb_total = sum(refurb_summary.values())
+
+    new_total = db.execute(
+        "SELECT COUNT(DISTINCT url) as cnt FROM new_products WHERE buyable = 1"
+    ).fetchone()["cnt"]
+
+    # Retailer cache counts
+    bestbuy_count = 0
+    bh_count = 0
+    swappa_count = 0
+    try:
+        retailer_rows = db.execute(
+            "SELECT retailer, data FROM retailer_cache"
+        ).fetchall()
+        for row in retailer_rows:
+            try:
+                data = json.loads(row["data"])
+                count = len(data.get("listings", []))
+                if row["retailer"] == "bestbuy":
+                    bestbuy_count += count
+                elif row["retailer"] == "bh":
+                    bh_count += count
+                elif row["retailer"] == "swappa":
+                    swappa_count += count
+            except (json.JSONDecodeError, TypeError):
+                pass
+    except Exception:
+        pass
 
     return jsonify({
-        "product_id": product_id,
-        "available": len(matches) > 0,
-        "count": len(matches),
-        "listings": [dict(m) for m in matches[:20]],
+        "new_total": new_total,
+        "refurbished_total": refurb_total,
+        "refurbished_categories": refurb_summary,
+        "bestbuy_total": bestbuy_count,
+        "bh_total": bh_count,
+        "swappa_total": swappa_count,
+        "combined_total": new_total + refurb_total,
     })
 
 
 @app.route("/api/alerts", methods=["POST"])
 def api_create_alert():
-    """Create a new alert subscription."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "JSON body required"}), 400
@@ -469,7 +1075,6 @@ def api_create_alert():
     notify_sms = bool(data.get("notify_sms", False))
     tier = data.get("tier", "free").strip().lower()
 
-    # Validation
     product = get_product_by_id(product_id)
     if not product:
         return jsonify({"error": "Invalid product"}), 400
@@ -485,42 +1090,49 @@ def api_create_alert():
         return jsonify({"error": "Invalid email address"}), 400
 
     now = datetime.now(timezone.utc).isoformat()
-
     db = get_db()
 
-    # Check if product is currently available on refurbished store
+    # Check if product is currently available (new or refurbished)
     refurbished = db.execute(
         "SELECT * FROM refurbished_products WHERE category = ? AND available = 1",
         (product["category"],),
     ).fetchall()
-    matches = match_product_to_refurbished(product, [dict(r) for r in refurbished])
+    refurb_matches = match_product_to_refurbished(product, [dict(r) for r in refurbished])
 
-    if matches:
-        # Product is available NOW — notify immediately and create a completed alert
+    new_rows = db.execute(
+        "SELECT * FROM new_products WHERE category = ? AND buyable = 1",
+        (product["category"],),
+    ).fetchall()
+    new_matches = match_product_to_new(product, [dict(r) for r in new_rows])
+
+    if refurb_matches or new_matches:
         db.execute("""
             INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, notified_at, active)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
         """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, now, now))
         db.commit()
 
-        # Send immediate notifications in background
         def _notify():
             if notify_email and email:
-                send_email_notification(email, product["name"], matches)
+                send_email_notification(email, product["name"], refurb_matches, new_matches)
             if notify_sms and phone:
-                send_sms_notification(phone, product["name"], matches)
+                send_sms_notification(phone, product["name"], refurb_matches, new_matches)
 
         threading.Thread(target=_notify, daemon=True).start()
 
+        msg_parts = []
+        if new_matches:
+            msg_parts.append("available new")
+        if refurb_matches:
+            msg_parts.append(f"{len(refurb_matches)} refurbished listing(s)")
+
         return jsonify({
             "status": "available_now",
-            "message": f"{product['name']} is available now! Sending notification...",
-            "count": len(matches),
-            "listings": [dict(m) for m in matches[:10]],
+            "message": f"{product['name']} is {' and '.join(msg_parts)}! Sending notification...",
+            "new_count": len(new_matches),
+            "refurb_count": len(refurb_matches),
         })
-
     else:
-        # Product not available — create active alert
         db.execute("""
             INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, active)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
@@ -529,32 +1141,16 @@ def api_create_alert():
 
         return jsonify({
             "status": "watching",
-            "message": f"Alert set! We'll notify you when {product['name']} appears on Apple Refurbished.",
+            "message": f"Alert set! We'll notify you when {product['name']} becomes available on the Apple Store.",
         })
 
 
 @app.route("/api/alerts/check", methods=["GET"])
 def api_check_alerts():
-    """Get count of active alert subscriptions (for admin/debugging)."""
     db = get_db()
     active = db.execute("SELECT COUNT(*) as cnt FROM alerts WHERE active = 1").fetchone()["cnt"]
     total = db.execute("SELECT COUNT(*) as cnt FROM alerts").fetchone()["cnt"]
     return jsonify({"active_alerts": active, "total_alerts": total})
-
-
-@app.route("/api/refurbished/summary")
-def api_refurbished_summary():
-    """Get a summary of currently available refurbished products by category."""
-    db = get_db()
-    rows = db.execute("""
-        SELECT category, COUNT(*) as count
-        FROM refurbished_products
-        WHERE available = 1
-        GROUP BY category
-    """).fetchall()
-    summary = {r["category"]: r["count"] for r in rows}
-    total = sum(summary.values())
-    return jsonify({"categories": summary, "total": total})
 
 
 # ============================================================================
@@ -563,7 +1159,6 @@ def api_refurbished_summary():
 
 init_db()
 
-# Start background monitor thread
 monitor_thread = threading.Thread(target=background_monitor, daemon=True)
 monitor_thread.start()
 

@@ -3,11 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FindTheMac — Apple Refurbished Product Alerts</title>
+    <title>FindTheMac — Apple Product Availability Alerts</title>
     <style>
-        /* ================================================================
-           Reset & Base
-           ================================================================ */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
@@ -18,6 +15,10 @@
             --accent: #0071e3;
             --accent-hover: #0077ED;
             --green: #2d8a2d;
+            --blue: #1565c0;
+            --orange: #e65100;
+            --purple: #6a1b9a;
+            --teal: #00695c;
             --border: #d2d2d7;
             --shadow: 0 2px 12px rgba(0,0,0,0.08);
             --radius: 12px;
@@ -31,9 +32,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ================================================================
-           Header
-           ================================================================ */
         .header {
             background: rgba(255,255,255,0.72);
             backdrop-filter: saturate(180%) blur(20px);
@@ -75,10 +73,8 @@
             color: var(--text-secondary);
         }
         .header-stats strong { color: var(--green); }
+        .header-stats .new-count { color: var(--blue); }
 
-        /* ================================================================
-           Hero
-           ================================================================ */
         .hero {
             text-align: center;
             padding: 48px 24px 32px;
@@ -94,13 +90,10 @@
         .hero p {
             font-size: 18px;
             color: var(--text-secondary);
-            max-width: 520px;
+            max-width: 560px;
             margin: 0 auto;
         }
 
-        /* ================================================================
-           Search & Filters
-           ================================================================ */
         .controls {
             max-width: 1200px;
             margin: 0 auto 24px;
@@ -147,9 +140,6 @@
             border-color: var(--accent);
         }
 
-        /* ================================================================
-           Product Grid
-           ================================================================ */
         .product-grid {
             max-width: 1200px;
             margin: 0 auto;
@@ -171,9 +161,6 @@
         .product-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-        }
-        .product-card.has-refurbished {
-            border-color: var(--green);
         }
 
         .product-image {
@@ -217,21 +204,6 @@
             color: var(--text-secondary);
             margin-bottom: 8px;
         }
-        .product-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .badge-available {
-            background: #e8f5e9;
-            color: var(--green);
-        }
-        .badge-unavailable {
-            background: #f5f5f7;
-            color: var(--text-secondary);
-        }
 
         .no-results {
             grid-column: 1 / -1;
@@ -241,9 +213,6 @@
         }
         .no-results h3 { margin-bottom: 8px; color: var(--text); }
 
-        /* ================================================================
-           Modal Overlay
-           ================================================================ */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -255,14 +224,12 @@
             align-items: center;
             padding: 24px;
         }
-        .modal-overlay.visible {
-            display: flex;
-        }
+        .modal-overlay.visible { display: flex; }
 
         .modal {
             background: var(--card-bg);
             border-radius: 16px;
-            max-width: 520px;
+            max-width: 560px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
@@ -291,9 +258,7 @@
         }
         .modal-close:hover { color: var(--text); }
 
-        .modal-body {
-            padding: 16px 24px 24px;
-        }
+        .modal-body { padding: 16px 24px 24px; }
 
         .modal-product {
             display: flex;
@@ -316,49 +281,69 @@
             max-height: 60px;
             object-fit: contain;
         }
-        .modal-product-name {
-            font-size: 18px;
-            font-weight: 600;
-        }
+        .modal-product-name { font-size: 18px; font-weight: 600; }
         .modal-product-meta {
             font-size: 13px;
             color: var(--text-secondary);
             margin-top: 2px;
         }
 
-        /* Refurbished listings in modal */
-        .refurb-listings {
-            background: #f0faf0;
-            border: 1px solid #c8e6c9;
+        /* Availability sections */
+        .avail-section {
             border-radius: var(--radius);
             padding: 16px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
-        .refurb-listings h4 {
-            color: var(--green);
+        .avail-section h4 {
             margin-bottom: 10px;
             font-size: 14px;
         }
-        .refurb-item {
+        .avail-new {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+        }
+        .avail-new h4 { color: var(--blue); }
+        .avail-refurb {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+        }
+        .avail-refurb h4 { color: var(--green); }
+        .avail-bestbuy {
+            background: #fff8e1;
+            border: 1px solid #ffe082;
+        }
+        .avail-bestbuy h4 { color: #f57f17; }
+        .avail-bh {
+            background: #fce4ec;
+            border: 1px solid #f48fb1;
+        }
+        .avail-bh h4 { color: #c62828; }
+        .avail-swappa {
+            background: #f3e5f5;
+            border: 1px solid #ce93d8;
+        }
+        .avail-swappa h4 { color: var(--purple); }
+
+        .avail-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 8px 0;
-            border-bottom: 1px solid #c8e6c9;
+            border-bottom: 1px solid rgba(0,0,0,0.08);
             font-size: 13px;
         }
-        .refurb-item:last-child { border-bottom: none; }
-        .refurb-item-title {
+        .avail-item:last-child { border-bottom: none; }
+        .avail-item-title {
             flex: 1;
             margin-right: 12px;
             line-height: 1.3;
         }
-        .refurb-item-title a {
+        .avail-item-title a {
             color: var(--accent);
             text-decoration: none;
         }
-        .refurb-item-title a:hover { text-decoration: underline; }
-        .refurb-item-price {
+        .avail-item-title a:hover { text-decoration: underline; }
+        .avail-item-price {
             font-weight: 600;
             white-space: nowrap;
         }
@@ -373,14 +358,8 @@
             font-size: 14px;
         }
 
-        /* Form */
-        .alert-form h3 {
-            font-size: 16px;
-            margin-bottom: 16px;
-        }
-        .form-group {
-            margin-bottom: 16px;
-        }
+        .alert-form h3 { font-size: 16px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; }
         .form-group label {
             display: block;
             font-size: 13px;
@@ -442,16 +421,9 @@
             border-color: #af52de;
             background: #faf0ff;
         }
-        .tier-name {
-            font-weight: 700;
-            font-size: 15px;
-            margin-bottom: 2px;
-        }
+        .tier-name { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
         .tier-option.paid .tier-name { color: #af52de; }
-        .tier-desc {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
+        .tier-desc { font-size: 12px; color: var(--text-secondary); }
         .tier-badge {
             display: inline-block;
             font-size: 11px;
@@ -476,20 +448,10 @@
             transition: background 0.2s;
             width: 100%;
         }
-        .btn-primary {
-            background: var(--accent);
-            color: white;
-        }
+        .btn-primary { background: var(--accent); color: white; }
         .btn-primary:hover { background: var(--accent-hover); }
-        .btn-primary:disabled {
-            background: var(--border);
-            cursor: not-allowed;
-        }
-
-        .btn-success {
-            background: var(--green);
-            color: white;
-        }
+        .btn-primary:disabled { background: var(--border); cursor: not-allowed; }
+        .btn-success { background: var(--green); color: white; }
 
         .form-message {
             margin-top: 12px;
@@ -498,18 +460,9 @@
             font-size: 14px;
             display: none;
         }
-        .form-message.success {
-            background: #e8f5e9;
-            color: var(--green);
-            display: block;
-        }
-        .form-message.error {
-            background: #fce4ec;
-            color: #c62828;
-            display: block;
-        }
+        .form-message.success { background: #e8f5e9; color: var(--green); display: block; }
+        .form-message.error { background: #fce4ec; color: #c62828; display: block; }
 
-        /* Loading spinner */
         .loading {
             text-align: center;
             padding: 60px;
@@ -526,9 +479,26 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ================================================================
-           Responsive
-           ================================================================ */
+        .source-badges {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .source-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .source-badge.new-badge { background: #e3f2fd; color: var(--blue); }
+        .source-badge.refurb-badge { background: #e8f5e9; color: var(--green); }
+        .source-badge.bestbuy-badge { background: #fff8e1; color: #f57f17; }
+        .source-badge.bh-badge { background: #fce4ec; color: #c62828; }
+        .source-badge.swappa-badge { background: #f3e5f5; color: var(--purple); }
+
         @media (max-width: 640px) {
             .hero h1 { font-size: 28px; }
             .hero p { font-size: 16px; }
@@ -542,9 +512,6 @@
 </head>
 <body>
 
-<!-- ====================================================================
-     Header
-     ==================================================================== -->
 <header class="header">
     <div class="header-inner">
         <div class="logo">
@@ -552,22 +519,16 @@
             FindTheMac
         </div>
         <div class="header-stats" id="headerStats">
-            Loading refurbished inventory...
+            Checking inventory across stores...
         </div>
     </div>
 </header>
 
-<!-- ====================================================================
-     Hero
-     ==================================================================== -->
 <section class="hero">
-    <h1>Get Notified When Apple Products Go Refurbished</h1>
-    <p>Browse Apple products, pick the ones you want, and we'll alert you by email or text the moment they appear on Apple's refurbished store.</p>
+    <h1>Track Apple Product Availability</h1>
+    <p>Browse Apple products and get notified by email or text when they become available — new, refurbished, or from third-party retailers.</p>
 </section>
 
-<!-- ====================================================================
-     Search & Category Filters
-     ==================================================================== -->
 <section class="controls">
     <div class="search-bar">
         <input type="text" class="search-input" id="searchInput" placeholder="Search products... (e.g. MacBook Air M4, iPad Pro, iPhone 16)">
@@ -575,11 +536,15 @@
     <div class="filter-tabs" id="filterTabs">
         <button class="filter-tab active" data-category="all">All Products</button>
     </div>
+    <div class="filter-tabs" id="memoryTabs" style="margin-top:10px;">
+        <span style="font-size:13px;color:var(--text-secondary);padding:8px 0;margin-right:4px;">RAM:</span>
+        <button class="filter-tab memory-tab" data-memory="64">64 GB</button>
+        <button class="filter-tab memory-tab" data-memory="96">96 GB</button>
+        <button class="filter-tab memory-tab" data-memory="128">128 GB</button>
+        <button class="filter-tab memory-tab" data-memory="256">256 GB</button>
+    </div>
 </section>
 
-<!-- ====================================================================
-     Product Grid
-     ==================================================================== -->
 <div class="product-grid" id="productGrid">
     <div class="loading">
         <div class="spinner"></div>
@@ -587,9 +552,6 @@
     </div>
 </div>
 
-<!-- ====================================================================
-     Alert Signup Modal
-     ==================================================================== -->
 <div class="modal-overlay" id="modalOverlay">
     <div class="modal" id="modal">
         <div class="modal-header">
@@ -601,15 +563,13 @@
         <div class="modal-body">
             <div class="modal-product" id="modalProduct"></div>
 
-            <!-- Refurbished status -->
-            <div id="modalRefurbStatus">
+            <div id="modalAvailStatus">
                 <div class="loading" style="padding:20px;">
                     <div class="spinner"></div>
-                    <p style="font-size:13px;">Checking refurbished availability...</p>
+                    <p style="font-size:13px;">Checking Apple Store inventory...</p>
                 </div>
             </div>
 
-            <!-- Alert signup form -->
             <div class="alert-form" id="alertForm">
                 <h3 id="alertFormTitle">Get notified when it becomes available</h3>
 
@@ -657,22 +617,18 @@
     </div>
 </div>
 
-<!-- ====================================================================
-     JavaScript — Single Page Application Logic
-     ==================================================================== -->
 <script>
 (function() {
     'use strict';
 
-    // State
     let allProducts = [];
     let categories = [];
     let activeCategory = 'all';
     let searchQuery = '';
     let selectedProduct = null;
     let selectedTier = 'free';
+    let activeMemory = '';
 
-    // DOM refs
     const productGrid = document.getElementById('productGrid');
     const searchInput = document.getElementById('searchInput');
     const filterTabs = document.getElementById('filterTabs');
@@ -680,10 +636,10 @@
     const modalOverlay = document.getElementById('modalOverlay');
     const modalClose = document.getElementById('modalClose');
     const modalProduct = document.getElementById('modalProduct');
-    const modalRefurbStatus = document.getElementById('modalRefurbStatus');
+    const modalAvailStatus = document.getElementById('modalAvailStatus');
+    const memoryTabs = document.getElementById('memoryTabs');
     const modalTitle = document.getElementById('modalTitle');
     const alertFormTitle = document.getElementById('alertFormTitle');
-    const alertForm = document.getElementById('alertForm');
     const notifyEmail = document.getElementById('notifyEmail');
     const notifySms = document.getElementById('notifySms');
     const emailGroup = document.getElementById('emailGroup');
@@ -693,14 +649,11 @@
     const submitAlert = document.getElementById('submitAlert');
     const formMessage = document.getElementById('formMessage');
 
-    // ================================================================
-    // Fetch data
-    // ================================================================
     async function init() {
         try {
             const [prodRes, summaryRes] = await Promise.all([
                 fetch('/api/products'),
-                fetch('/api/refurbished/summary'),
+                fetch('/api/inventory/summary'),
             ]);
             const prodData = await prodRes.json();
             const summaryData = await summaryRes.json();
@@ -716,45 +669,44 @@
         }
     }
 
-    function updateHeaderStats(summary) {
-        if (summary.total > 0) {
-            headerStats.innerHTML = '<strong>' + summary.total + '</strong> refurbished products currently available';
+    function updateHeaderStats(s) {
+        var parts = [];
+        if (s.new_total > 0) parts.push('<span class="new-count"><strong>' + s.new_total + '</strong> new</span>');
+        if (s.refurbished_total > 0) parts.push('<strong>' + s.refurbished_total + '</strong> refurbished');
+        if (s.bestbuy_total > 0) parts.push(s.bestbuy_total + ' Best Buy');
+        if (s.bh_total > 0) parts.push(s.bh_total + ' B&H');
+        if (s.swappa_total > 0) parts.push(s.swappa_total + ' Swappa');
+        if (parts.length > 0) {
+            headerStats.innerHTML = parts.join(' + ') + ' products tracked';
         } else {
-            headerStats.textContent = 'Checking refurbished inventory...';
+            headerStats.textContent = 'Checking inventory across stores...';
         }
     }
 
-    // ================================================================
-    // Render category filter tabs
-    // ================================================================
     function renderFilterTabs() {
-        let html = '<button class="filter-tab active" data-category="all">All Products</button>';
-        categories.forEach(cat => {
-            html += '<button class="filter-tab" data-category="' + cat.id + '">' +
-                cat.icon + ' ' + cat.name + '</button>';
+        var html = '<button class="filter-tab active" data-category="all">All Products</button>';
+        categories.forEach(function(cat) {
+            html += '<button class="filter-tab" data-category="' + cat.id + '">' + cat.icon + ' ' + cat.name + '</button>';
         });
         filterTabs.innerHTML = html;
 
-        filterTabs.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
+        filterTabs.querySelectorAll('.filter-tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
                 activeCategory = tab.dataset.category;
-                filterTabs.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                filterTabs.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
                 tab.classList.add('active');
                 renderProducts();
             });
         });
     }
 
-    // ================================================================
-    // Render product grid
-    // ================================================================
     function renderProducts() {
-        const filtered = allProducts.filter(p => {
-            const matchesCat = activeCategory === 'all' || p.category === activeCategory;
-            const matchesSearch = !searchQuery ||
+        var filtered = allProducts.filter(function(p) {
+            var matchesCat = activeCategory === 'all' || p.category === activeCategory;
+            var matchesSearch = !searchQuery ||
                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 p.subcategory.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                p.keywords.some(k => k.toLowerCase().includes(searchQuery.toLowerCase()));
+                p.keywords.some(function(k) { return k.toLowerCase().includes(searchQuery.toLowerCase()); });
             return matchesCat && matchesSearch;
         });
 
@@ -763,12 +715,11 @@
             return;
         }
 
-        // Sort by year descending, then name
-        filtered.sort((a, b) => b.year - a.year || a.name.localeCompare(b.name));
+        filtered.sort(function(a, b) { return b.year - a.year || a.name.localeCompare(b.name); });
 
-        let html = '';
-        filtered.forEach(product => {
-            const catInfo = categories.find(c => c.id === product.category) || {};
+        var html = '';
+        filtered.forEach(function(product) {
+            var catInfo = categories.find(function(c) { return c.id === product.category; }) || {};
             html += '<div class="product-card" data-id="' + product.id + '">' +
                 '<div class="product-image">' +
                     '<img src="' + product.image + '" alt="' + escapeHtml(product.name) + '" loading="lazy" onerror="this.parentElement.innerHTML=\'<div class=placeholder-icon>' + (catInfo.icon || '&#63743;') + '</div>\'">' +
@@ -783,22 +734,17 @@
 
         productGrid.innerHTML = html;
 
-        // Attach click handlers
-        productGrid.querySelectorAll('.product-card').forEach(card => {
-            card.addEventListener('click', () => openModal(card.dataset.id));
+        productGrid.querySelectorAll('.product-card').forEach(function(card) {
+            card.addEventListener('click', function() { openModal(card.dataset.id); });
         });
     }
 
-    // ================================================================
-    // Modal
-    // ================================================================
     async function openModal(productId) {
-        selectedProduct = allProducts.find(p => p.id === productId);
+        selectedProduct = allProducts.find(function(p) { return p.id === productId; });
         if (!selectedProduct) return;
 
-        const catInfo = categories.find(c => c.id === selectedProduct.category) || {};
+        var catInfo = categories.find(function(c) { return c.id === selectedProduct.category; }) || {};
 
-        // Reset form
         formMessage.className = 'form-message';
         formMessage.style.display = 'none';
         submitAlert.disabled = false;
@@ -808,7 +754,6 @@
         document.getElementById('tierFree').classList.add('active');
         document.getElementById('tierPaid').classList.remove('active');
 
-        // Show product info
         modalTitle.textContent = 'Set Up Alert';
         modalProduct.innerHTML =
             '<div class="modal-product-img">' +
@@ -819,47 +764,126 @@
                 '<div class="modal-product-meta">' + selectedProduct.subcategory + ' &middot; ' + selectedProduct.year + '</div>' +
             '</div>';
 
-        // Show loading for refurb status
-        modalRefurbStatus.innerHTML =
+        modalAvailStatus.innerHTML =
             '<div class="loading" style="padding:20px;">' +
                 '<div class="spinner"></div>' +
-                '<p style="font-size:13px;">Checking Apple Refurbished Store...</p>' +
+                '<p style="font-size:13px;">Checking inventory across all stores...</p>' +
             '</div>';
 
         alertFormTitle.textContent = 'Get notified when it becomes available';
 
         modalOverlay.classList.add('visible');
 
-        // Check refurbished availability
         try {
-            const res = await fetch('/api/refurbished/status/' + productId);
-            const data = await res.json();
+            var availUrl = '/api/availability/' + productId;
+            if (activeMemory) availUrl += '?memory=' + activeMemory;
+            var res = await fetch(availUrl);
+            var data = await res.json();
 
-            if (data.available && data.listings && data.listings.length > 0) {
-                let listingsHtml = '<div class="refurb-listings"><h4>&#10003; Available Now on Apple Refurbished (' + data.count + ' listing' + (data.count !== 1 ? 's' : '') + ')</h4>';
-                data.listings.slice(0, 5).forEach(item => {
-                    listingsHtml += '<div class="refurb-item">' +
-                        '<div class="refurb-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
-                        '<div class="refurb-item-price">$' + item.price + '</div>' +
+            var html = '';
+            var anyAvailable = false;
+
+            // New (Apple Store)
+            if (data.new && data.new.available && data.new.listings.length > 0) {
+                anyAvailable = true;
+                var seenUrls = {};
+                html += '<div class="avail-section avail-new"><h4>Available NEW on Apple.com</h4>';
+                data.new.listings.forEach(function(item) {
+                    if (!seenUrls[item.url]) {
+                        seenUrls[item.url] = true;
+                        html += '<div class="avail-item">' +
+                            '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
+                            '<div class="avail-item-price" style="color:var(--blue);">Buy New</div>' +
+                        '</div>';
+                    }
+                });
+                html += '</div>';
+            }
+
+            // Refurbished (Apple Store)
+            if (data.refurbished && data.refurbished.available && data.refurbished.listings.length > 0) {
+                anyAvailable = true;
+                html += '<div class="avail-section avail-refurb"><h4>Available on Apple Refurbished (' + data.refurbished.count + ' listing' + (data.refurbished.count !== 1 ? 's' : '') + ')</h4>';
+                data.refurbished.listings.slice(0, 5).forEach(function(item) {
+                    html += '<div class="avail-item">' +
+                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
+                        '<div class="avail-item-price">$' + item.price + '</div>' +
                     '</div>';
                 });
-                if (data.count > 5) {
-                    listingsHtml += '<div style="text-align:center;padding-top:8px;font-size:13px;color:var(--text-secondary);">+ ' + (data.count - 5) + ' more listings</div>';
+                if (data.refurbished.count > 5) {
+                    html += '<div style="text-align:center;padding-top:8px;font-size:13px;color:var(--text-secondary);">+ ' + (data.refurbished.count - 5) + ' more</div>';
                 }
-                listingsHtml += '</div>';
-                modalRefurbStatus.innerHTML = listingsHtml;
-                alertFormTitle.textContent = 'Get notified immediately about these listings';
+                html += '</div>';
+            }
+
+            // Best Buy
+            if (data.bestbuy && data.bestbuy.available && data.bestbuy.listings.length > 0) {
+                anyAvailable = true;
+                html += '<div class="avail-section avail-bestbuy"><h4>Available at Best Buy (' + data.bestbuy.count + ' listing' + (data.bestbuy.count !== 1 ? 's' : '') + ')</h4>';
+                data.bestbuy.listings.slice(0, 5).forEach(function(item) {
+                    html += '<div class="avail-item">' +
+                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
+                        '<div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div>' +
+                    '</div>';
+                });
+                html += '</div>';
+            }
+
+            // B&H Photo
+            if (data.bh && data.bh.available && data.bh.listings.length > 0) {
+                anyAvailable = true;
+                html += '<div class="avail-section avail-bh"><h4>Available at B&amp;H Photo (' + data.bh.count + ' listing' + (data.bh.count !== 1 ? 's' : '') + ')</h4>';
+                data.bh.listings.slice(0, 5).forEach(function(item) {
+                    html += '<div class="avail-item">' +
+                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
+                        '<div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div>' +
+                    '</div>';
+                });
+                html += '</div>';
+            }
+
+            // Swappa
+            if (data.swappa && data.swappa.available && data.swappa.listings.length > 0) {
+                anyAvailable = true;
+                html += '<div class="avail-section avail-swappa"><h4>Available on Swappa (' + data.swappa.count + ' listing' + (data.swappa.count !== 1 ? 's' : '') + ')</h4>';
+                data.swappa.listings.slice(0, 5).forEach(function(item) {
+                    html += '<div class="avail-item">' +
+                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
+                        '<div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div>' +
+                    '</div>';
+                });
+                html += '</div>';
+            }
+
+            // Search links for retailers that had no results
+            var searchLinks = [];
+            if (data.bestbuy && !data.bestbuy.available && data.bestbuy.search_url) {
+                searchLinks.push('<a href="' + data.bestbuy.search_url + '" target="_blank" rel="noopener" style="color:#f57f17;">Best Buy</a>');
+            }
+            if (data.bh && !data.bh.available && data.bh.search_url) {
+                searchLinks.push('<a href="' + data.bh.search_url + '" target="_blank" rel="noopener" style="color:#c62828;">B&amp;H Photo</a>');
+            }
+            if (data.swappa && !data.swappa.available && data.swappa.search_url) {
+                searchLinks.push('<a href="' + data.swappa.search_url + '" target="_blank" rel="noopener" style="color:var(--purple);">Swappa</a>');
+            }
+            if (searchLinks.length > 0) {
+                html += '<div style="text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Search directly: ' + searchLinks.join(' &middot; ') + '</div>';
+            }
+
+            if (anyAvailable) {
+                modalAvailStatus.innerHTML = html;
+                alertFormTitle.textContent = 'Get notified about these listings';
                 submitAlert.textContent = 'Notify Me Now';
                 submitAlert.className = 'btn btn-success';
             } else {
-                modalRefurbStatus.innerHTML =
+                modalAvailStatus.innerHTML =
                     '<div class="not-available-msg">' +
-                        'Not currently available on Apple Refurbished.<br>' +
+                        'Not currently found across any stores we monitor.<br>' +
                         '<strong>Set an alert below</strong> and we\'ll notify you when it appears!' +
                     '</div>';
             }
-        } catch {
-            modalRefurbStatus.innerHTML =
+        } catch (e) {
+            modalAvailStatus.innerHTML =
                 '<div class="not-available-msg">Could not check availability. Set an alert to be notified.</div>';
         }
     }
@@ -870,48 +894,69 @@
     }
 
     modalClose.addEventListener('click', closeModal);
-    modalOverlay.addEventListener('click', (e) => {
+    modalOverlay.addEventListener('click', function(e) {
         if (e.target === modalOverlay) closeModal();
     });
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeModal();
     });
 
-    // Tier selector
-    const tierFree = document.getElementById('tierFree');
-    const tierPaid = document.getElementById('tierPaid');
+    // Memory filter tabs
+    memoryTabs.querySelectorAll('.memory-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var mem = tab.dataset.memory;
+            if (activeMemory === mem) {
+                activeMemory = '';
+                tab.classList.remove('active');
+            } else {
+                activeMemory = mem;
+                memoryTabs.querySelectorAll('.memory-tab').forEach(function(t) { t.classList.remove('active'); });
+                tab.classList.add('active');
+            }
+            // Switch to Mac category and set search
+            if (activeMemory) {
+                activeCategory = 'mac';
+                filterTabs.querySelectorAll('.filter-tab').forEach(function(t) {
+                    t.classList.toggle('active', t.dataset.category === 'mac');
+                });
+                searchInput.value = activeMemory + 'GB';
+                searchQuery = activeMemory + 'GB';
+            } else {
+                searchInput.value = '';
+                searchQuery = '';
+            }
+            renderProducts();
+        });
+    });
 
-    tierFree.addEventListener('click', () => {
+    var tierFree = document.getElementById('tierFree');
+    var tierPaid = document.getElementById('tierPaid');
+    tierFree.addEventListener('click', function() {
         selectedTier = 'free';
         tierFree.classList.add('active');
         tierPaid.classList.remove('active');
     });
-    tierPaid.addEventListener('click', () => {
+    tierPaid.addEventListener('click', function() {
         selectedTier = 'paid';
         tierPaid.classList.add('active');
         tierFree.classList.remove('active');
     });
 
-    // Toggle form fields based on checkboxes
-    notifyEmail.addEventListener('change', () => {
+    notifyEmail.addEventListener('change', function() {
         emailGroup.style.display = notifyEmail.checked ? 'block' : 'none';
     });
-    notifySms.addEventListener('change', () => {
+    notifySms.addEventListener('change', function() {
         phoneGroup.style.display = notifySms.checked ? 'block' : 'none';
     });
 
-    // ================================================================
-    // Submit alert
-    // ================================================================
-    submitAlert.addEventListener('click', async () => {
+    submitAlert.addEventListener('click', async function() {
         if (!selectedProduct) return;
 
-        const wantEmail = notifyEmail.checked;
-        const wantSms = notifySms.checked;
-        const email = emailInput.value.trim();
-        const phone = phoneInput.value.trim();
+        var wantEmail = notifyEmail.checked;
+        var wantSms = notifySms.checked;
+        var email = emailInput.value.trim();
+        var phone = phoneInput.value.trim();
 
-        // Validate
         if (!wantEmail && !wantSms) {
             showMessage('error', 'Please select at least one notification method.');
             return;
@@ -933,7 +978,7 @@
         submitAlert.textContent = 'Setting up alert...';
 
         try {
-            const res = await fetch('/api/alerts', {
+            var res = await fetch('/api/alerts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -946,7 +991,7 @@
                 }),
             });
 
-            const data = await res.json();
+            var data = await res.json();
 
             if (!res.ok) {
                 showMessage('error', data.error || 'Something went wrong.');
@@ -961,32 +1006,26 @@
                     (wantEmail && wantSms ? ' and ' : '') +
                     (wantSms ? 'phone' : '') + '.');
             } else {
-                showMessage('success', 'Alert set! We\'ll notify you when ' + selectedProduct.name + ' appears on Apple Refurbished.');
+                showMessage('success', 'Alert set! We\'ll notify you when ' + selectedProduct.name + ' becomes available.');
             }
 
             submitAlert.textContent = 'Alert Set!';
-        } catch {
+        } catch (e) {
             showMessage('error', 'Network error. Please try again.');
             submitAlert.disabled = false;
             submitAlert.textContent = 'Set Alert';
         }
     });
 
-    // ================================================================
-    // Search
-    // ================================================================
-    let searchTimeout;
-    searchInput.addEventListener('input', () => {
+    var searchTimeout;
+    searchInput.addEventListener('input', function() {
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
+        searchTimeout = setTimeout(function() {
             searchQuery = searchInput.value;
             renderProducts();
         }, 200);
     });
 
-    // ================================================================
-    // Helpers
-    // ================================================================
     function showMessage(type, msg) {
         formMessage.className = 'form-message ' + type;
         formMessage.textContent = msg;
@@ -998,14 +1037,11 @@
     }
 
     function escapeHtml(str) {
-        const div = document.createElement('div');
+        var div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
     }
 
-    // ================================================================
-    // Init
-    // ================================================================
     init();
 })();
 </script>
