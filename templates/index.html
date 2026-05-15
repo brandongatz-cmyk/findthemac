@@ -636,6 +636,7 @@
     let selectedProduct = null;
     let selectedTier = 'free';
     let activeMemory = '';
+    let defaultView = true;
 
     const productGrid = document.getElementById('productGrid');
     const searchInput = document.getElementById('searchInput');
@@ -700,6 +701,7 @@
 
         filterTabs.querySelectorAll('.filter-tab').forEach(function(tab) {
             tab.addEventListener('click', function() {
+                defaultView = false;
                 activeCategory = tab.dataset.category;
                 filterTabs.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
                 tab.classList.add('active');
@@ -710,6 +712,9 @@
 
     function renderProducts() {
         var filtered = allProducts.filter(function(p) {
+            if (defaultView) {
+                return p.subcategory === 'Mac mini' || p.subcategory === 'Mac Studio';
+            }
             var matchesCat = activeCategory === 'all' || p.category === activeCategory;
             var matchesSearch = !searchQuery ||
                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1036,6 +1041,7 @@
     searchInput.addEventListener('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
+            defaultView = false;
             searchQuery = searchInput.value;
             renderProducts();
         }, 200);
