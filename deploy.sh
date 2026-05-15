@@ -19,7 +19,7 @@ ufw --force enable
 echo "=== Step 4: Clone the App ==="
 mkdir -p /var/www
 cd /var/www
-git clone https://github.com/brandongatz-cmyk/Find_the_Mac.git findthemac
+git clone -b claude/apple-product-alerts-ST7Go https://github.com/brandongatz-cmyk/Find_the_Mac.git findthemac
 cd findthemac
 
 echo "=== Step 5: Python Virtual Environment ==="
@@ -30,9 +30,10 @@ pip install -r requirements.txt
 
 echo "=== Step 6: Create Environment File ==="
 cat > /var/www/findthemac/.env << 'ENVFILE'
-# Monitoring intervals
-CHECK_INTERVAL_FREE_MINUTES=5
-CHECK_INTERVAL_PAID_SECONDS=15
+# Monitoring intervals (Free=15min, Pro=90sec, Ultra=15sec)
+CHECK_INTERVAL_FREE_MINUTES=15
+CHECK_INTERVAL_PRO_SECONDS=90
+CHECK_INTERVAL_ULTRA_SECONDS=15
 
 # Email alerts (Gmail example — use an App Password, not your real password)
 # SMTP_HOST=smtp.gmail.com
