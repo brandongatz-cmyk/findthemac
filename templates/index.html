@@ -576,13 +576,21 @@
                 <div class="tier-selector">
                     <div class="tier-option active" data-tier="free" id="tierFree">
                         <div class="tier-name">Free</div>
-                        <div class="tier-desc">Checks every 5 minutes</div>
+                        <div class="tier-desc">Every 15 min</div>
+                        <div class="tier-desc">Email only</div>
                         <span class="tier-badge free-badge">$0</span>
                     </div>
-                    <div class="tier-option paid" data-tier="paid" id="tierPaid">
-                        <div class="tier-name">Paid</div>
-                        <div class="tier-desc">Checks every 15 seconds</div>
-                        <span class="tier-badge paid-badge">Priority</span>
+                    <div class="tier-option paid" data-tier="standard" id="tierStandard">
+                        <div class="tier-name">Standard</div>
+                        <div class="tier-desc">Every 90 sec</div>
+                        <div class="tier-desc">Email + SMS</div>
+                        <span class="tier-badge paid-badge">$7/mo</span>
+                    </div>
+                    <div class="tier-option paid" data-tier="premium" id="tierPremium">
+                        <div class="tier-name">Premium</div>
+                        <div class="tier-desc">Every 15 sec</div>
+                        <div class="tier-desc">Email + SMS</div>
+                        <span class="tier-badge paid-badge">$14/mo</span>
                     </div>
                 </div>
 
@@ -752,7 +760,11 @@
         submitAlert.className = 'btn btn-primary';
         selectedTier = 'free';
         document.getElementById('tierFree').classList.add('active');
-        document.getElementById('tierPaid').classList.remove('active');
+        document.getElementById('tierStandard').classList.remove('active');
+        document.getElementById('tierPremium').classList.remove('active');
+        notifySms.checked = false;
+        notifySms.parentElement.style.display = 'none';
+        phoneGroup.style.display = 'none';
 
         modalTitle.textContent = 'Set Up Alert';
         modalProduct.innerHTML =
@@ -929,17 +941,20 @@
         });
     });
 
-    var tierFree = document.getElementById('tierFree');
-    var tierPaid = document.getElementById('tierPaid');
-    tierFree.addEventListener('click', function() {
-        selectedTier = 'free';
-        tierFree.classList.add('active');
-        tierPaid.classList.remove('active');
-    });
-    tierPaid.addEventListener('click', function() {
-        selectedTier = 'paid';
-        tierPaid.classList.add('active');
-        tierFree.classList.remove('active');
+    var tierButtons = document.querySelectorAll('.tier-option');
+    tierButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            selectedTier = btn.dataset.tier;
+            tierButtons.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            if (selectedTier === 'free') {
+                notifySms.checked = false;
+                notifySms.parentElement.style.display = 'none';
+                phoneGroup.style.display = 'none';
+            } else {
+                notifySms.parentElement.style.display = 'flex';
+            }
+        });
     });
 
     notifyEmail.addEventListener('change', function() {

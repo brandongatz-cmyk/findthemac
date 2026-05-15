@@ -38,8 +38,9 @@ logging.basicConfig(
 logger = logging.getLogger("findthemac")
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "findthemac.db")
-CHECK_INTERVAL_FREE = int(os.getenv("CHECK_INTERVAL_FREE_MINUTES", "5"))
-CHECK_INTERVAL_PAID = int(os.getenv("CHECK_INTERVAL_PAID_SECONDS", "15"))
+CHECK_INTERVAL_FREE = int(os.getenv("CHECK_INTERVAL_FREE_MINUTES", "15"))
+CHECK_INTERVAL_STANDARD = int(os.getenv("CHECK_INTERVAL_STANDARD_SECONDS", "90"))
+CHECK_INTERVAL_PREMIUM = int(os.getenv("CHECK_INTERVAL_PREMIUM_SECONDS", "15"))
 
 # ============================================================================
 # Apple product catalog
@@ -632,8 +633,8 @@ def match_product_to_new(product, new_products_list):
 # Notifications
 # ============================================================================
 
-def send_email_notification(to_email, product_name, refurb_matches, new_matches):
-    """Send an email alert about available products (new and/or refurbished)."""
+def send_email_notification(to_email, product_name, refurb_matches, new_matches, retailer_results=None):
+    """Send an email alert about available products across all sources."""
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USERNAME", "")
@@ -644,14 +645,21 @@ def send_email_notification(to_email, product_name, refurb_matches, new_matches)
         logger.warning("SMTP not configured, skipping email to %s", to_email)
         return False
 
+    if retailer_results is None:
+        retailer_results = {}
+
     avail_types = []
     if new_matches:
         avail_types.append("new")
     if refurb_matches:
         avail_types.append("refurbished")
-    avail_label = " & ".join(avail_types)
+    for rname, rdata in retailer_results.items():
+        if rdata.get("listings"):
+            label = {"bestbuy": "Best Buy", "bh": "B&H Photo", "swappa": "Swappa"}.get(rname, rname)
+            avail_types.append(label)
+    avail_label = ", ".join(avail_types) if avail_types else "multiple sources"
 
-    subject = f"FindTheMac Alert: {product_name} is available {avail_label}!"
+    subject = f"FindTheMac Alert: {product_name} is available!"
 
     # Build HTML sections
     new_section = ""
@@ -702,6 +710,36 @@ def send_email_notification(to_email, product_name, refurb_matches, new_matches)
             <table style="width:100%;border-collapse:collapse;">{refurb_rows}</table>
         </div>"""
 
+    retailer_section = ""
+    retailer_configs = {
+        "bestbuy": {"name": "Best Buy", "bg": "#fff8e1", "border": "#ffe082", "color": "#f57f17"},
+        "bh": {"name": "B&H Photo", "bg": "#fce4ec", "border": "#f48fb1", "color": "#c62828"},
+        "swappa": {"name": "Swappa", "bg": "#f3e5f5", "border": "#ce93d8", "color": "#6a1b9a"},
+    }
+    for rname, cfg in retailer_configs.items():
+        rdata = retailer_results.get(rname, {})
+        listings = rdata.get("listings", [])
+        if listings:
+            rows = ""
+            for item in listings[:5]:
+                url = item.get("url", "")
+                title = item.get("title", "Unknown")
+                price = item.get("price", "")
+                price_display = f"${price}" if price else "See Price"
+                rows += f"""<tr>
+                    <td style="padding:10px;border-bottom:1px solid {cfg['border']};">
+                        <a href="{url}" style="color:#0071e3;text-decoration:none;font-weight:600;">{title}</a>
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid {cfg['border']};text-align:right;">
+                        <strong>{price_display}</strong>
+                    </td>
+                </tr>"""
+            retailer_section += f"""
+            <div style="background:{cfg['bg']};border:1px solid {cfg['border']};border-radius:12px;padding:16px;margin-bottom:20px;">
+                <h3 style="color:{cfg['color']};margin:0 0 10px;font-size:16px;">Available at {cfg['name']} ({len(listings)} listing{'s' if len(listings) != 1 else ''})</h3>
+                <table style="width:100%;border-collapse:collapse;">{rows}</table>
+            </div>"""
+
     html = f"""
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;">
         <div style="background:#f5f5f7;padding:20px;text-align:center;border-radius:12px 12px 0 0;">
@@ -711,6 +749,7 @@ def send_email_notification(to_email, product_name, refurb_matches, new_matches)
             <h2 style="color:#1d1d1f;font-size:18px;">Good news! {product_name} is available.</h2>
             {new_section}
             {refurb_section}
+            {retailer_section}
             <p style="margin-top:20px;">
                 <a href="https://www.apple.com/shop" style="background:#0071e3;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
                     Shop Apple Store
@@ -724,7 +763,7 @@ def send_email_notification(to_email, product_name, refurb_matches, new_matches)
 
     text = f"FindTheMac Alert: {product_name} is available!\n\n"
     if new_matches:
-        text += "AVAILABLE NEW:\n"
+        text += "AVAILABLE NEW ON APPLE.COM:\n"
         seen = set()
         for m in new_matches[:5]:
             url = m["url"] if isinstance(m, dict) else m[2]
@@ -738,6 +777,17 @@ def send_email_notification(to_email, product_name, refurb_matches, new_matches)
         for m in refurb_matches[:10]:
             text += f"- {m['title']} — ${m['price']} (was ${m['original_price']})\n  {m['url']}\n"
         text += "\n"
+    for rname, rdata in retailer_results.items():
+        listings = rdata.get("listings", [])
+        if listings:
+            label = {"bestbuy": "BEST BUY", "bh": "B&H PHOTO", "swappa": "SWAPPA"}.get(rname, rname.upper())
+            text += f"AVAILABLE AT {label}:\n"
+            for item in listings[:5]:
+                title = item.get("title", "Unknown")
+                url = item.get("url", "")
+                price = item.get("price", "")
+                text += f"- {title}" + (f" — ${price}" if price else "") + f"\n  {url}\n"
+            text += "\n"
     text += "Shop: https://www.apple.com/shop\n"
 
     msg = MIMEMultipart("alternative")
@@ -759,8 +809,11 @@ def send_email_notification(to_email, product_name, refurb_matches, new_matches)
         return False
 
 
-def send_sms_notification(to_phone, product_name, refurb_matches, new_matches):
-    """Send an SMS alert via Twilio."""
+def send_sms_notification(to_phone, product_name, refurb_matches, new_matches, retailer_results=None):
+    """Send an SMS alert via Twilio with direct links."""
+    if retailer_results is None:
+        retailer_results = {}
+
     sid = os.getenv("TWILIO_ACCOUNT_SID", "")
     token = os.getenv("TWILIO_AUTH_TOKEN", "")
     from_num = os.getenv("TWILIO_FROM_NUMBER", "")
@@ -771,12 +824,16 @@ def send_sms_notification(to_phone, product_name, refurb_matches, new_matches):
 
     body = f"FindTheMac: {product_name} is now available!\n"
     if new_matches:
-        body += f"\nNEW: Available on Apple.com"
+        url = new_matches[0]["url"] if isinstance(new_matches[0], dict) else new_matches[0][2]
+        body += f"\nNEW on Apple.com:\n{url}"
     if refurb_matches:
-        body += f"\nREFURBISHED: {len(refurb_matches)} listing(s)"
-        for m in refurb_matches[:2]:
-            body += f"\n${m['price']} - {m['title'][:50]}"
-    body += "\n\napple.com/shop"
+        body += f"\nREFURBISHED ({len(refurb_matches)}):\n{refurb_matches[0]['url']}"
+    for rname, rdata in retailer_results.items():
+        listings = rdata.get("listings", [])
+        if listings:
+            label = {"bestbuy": "Best Buy", "bh": "B&H Photo", "swappa": "Swappa"}.get(rname, rname)
+            url = listings[0].get("url", rdata.get("search_url", ""))
+            body += f"\n{label}:\n{url}"
 
     try:
         from twilio.rest import Client
@@ -855,19 +912,29 @@ def process_alerts(tier, refurbished, new_products):
             refurb_matches = match_product_to_refurbished(product, refurbished) if refurbished else []
             new_matches = match_product_to_new(product, new_products) if new_products else []
 
-            if not refurb_matches and not new_matches:
+            retailer_results = search_all_retailers(product)
+            has_retailer_hits = any(
+                rdata.get("listings") for rdata in retailer_results.values()
+            )
+
+            if not refurb_matches and not new_matches and not has_retailer_hits:
                 continue
 
+            retailer_count = sum(len(d.get("listings", [])) for d in retailer_results.values())
             logger.info(
-                "Product '%s' has %d new + %d refurbished match(es) [%s tier]",
-                product["name"], len(new_matches), len(refurb_matches), tier,
+                "Product '%s': %d new + %d refurb + %d retailer [%s tier]",
+                product["name"], len(new_matches), len(refurb_matches), retailer_count, tier,
             )
 
             sent = False
             if alert["notify_email"] and alert["email"]:
-                sent = send_email_notification(alert["email"], product["name"], refurb_matches, new_matches) or sent
+                sent = send_email_notification(
+                    alert["email"], product["name"], refurb_matches, new_matches, retailer_results
+                ) or sent
             if alert["notify_sms"] and alert["phone"]:
-                sent = send_sms_notification(alert["phone"], product["name"], refurb_matches, new_matches) or sent
+                sent = send_sms_notification(
+                    alert["phone"], product["name"], refurb_matches, new_matches, retailer_results
+                ) or sent
 
             if sent:
                 conn.execute(
@@ -879,44 +946,59 @@ def process_alerts(tier, refurbished, new_products):
 
 
 def background_monitor():
-    """Background thread: paid tier every 15s, free tier every 5 min, new products every 5 min."""
+    """Background thread: premium every 15s, standard every 90s, free every 15 min."""
     time.sleep(10)
 
     free_interval = CHECK_INTERVAL_FREE * 60
-    paid_interval = CHECK_INTERVAL_PAID
-    new_products_interval = 300  # 5 minutes
-    time_since_free_check = free_interval
-    time_since_new_check = new_products_interval
+    standard_interval = CHECK_INTERVAL_STANDARD
+    premium_interval = CHECK_INTERVAL_PREMIUM
+    refurb_scrape_interval = 120
+    new_scrape_interval = 300
+
+    time_since_free = free_interval
+    time_since_standard = standard_interval
+    time_since_refurb_scrape = refurb_scrape_interval
+    time_since_new_scrape = new_scrape_interval
 
     while True:
         try:
-            # Update new products cache every 5 minutes
-            time_since_new_check += paid_interval
-            if time_since_new_check >= new_products_interval:
+            time_since_refurb_scrape += premium_interval
+            if time_since_refurb_scrape >= refurb_scrape_interval:
+                update_refurbished_cache()
+                time_since_refurb_scrape = 0
+
+            time_since_new_scrape += premium_interval
+            if time_since_new_scrape >= new_scrape_interval:
                 update_new_products_cache()
-                time_since_new_check = 0
+                time_since_new_scrape = 0
 
-            # Update refurbished cache every cycle
-            refurbished = update_refurbished_cache()
-
-            # Load current new products from DB
             with get_db_connection() as conn:
+                refurb_rows = conn.execute(
+                    "SELECT * FROM refurbished_products WHERE available = 1"
+                ).fetchall()
+                refurbished = [dict(r) for r in refurb_rows]
+
                 new_rows = conn.execute(
                     "SELECT * FROM new_products WHERE buyable = 1"
                 ).fetchall()
                 new_products = [dict(r) for r in new_rows]
 
-            if refurbished or new_products:
-                process_alerts("paid", refurbished or [], new_products)
+            process_alerts("premium", refurbished, new_products)
 
-                time_since_free_check += paid_interval
-                if time_since_free_check >= free_interval:
-                    process_alerts("free", refurbished or [], new_products)
-                    time_since_free_check = 0
+            time_since_standard += premium_interval
+            if time_since_standard >= standard_interval:
+                process_alerts("standard", refurbished, new_products)
+                time_since_standard = 0
+
+            time_since_free += premium_interval
+            if time_since_free >= free_interval:
+                process_alerts("free", refurbished, new_products)
+                time_since_free = 0
+
         except Exception as exc:
             logger.error("Monitor error: %s", exc)
 
-        time.sleep(paid_interval)
+        time.sleep(premium_interval)
 
 
 # ============================================================================
@@ -1064,8 +1146,10 @@ def api_create_alert():
     product = get_product_by_id(product_id)
     if not product:
         return jsonify({"error": "Invalid product"}), 400
-    if tier not in ("free", "paid"):
-        return jsonify({"error": "Invalid tier. Must be 'free' or 'paid'."}), 400
+    if tier not in ("free", "standard", "premium"):
+        return jsonify({"error": "Invalid tier."}), 400
+    if tier == "free" and notify_sms:
+        return jsonify({"error": "SMS notifications require a paid plan (Standard or Premium)."}), 400
     if not notify_email and not notify_sms:
         return jsonify({"error": "Select at least one notification method"}), 400
     if notify_email and not email:
@@ -1091,7 +1175,10 @@ def api_create_alert():
     ).fetchall()
     new_matches = match_product_to_new(product, [dict(r) for r in new_rows])
 
-    if refurb_matches or new_matches:
+    retailer_results = search_all_retailers(product)
+    has_retailer_hits = any(rdata.get("listings") for rdata in retailer_results.values())
+
+    if refurb_matches or new_matches or has_retailer_hits:
         db.execute("""
             INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, notified_at, active)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
@@ -1100,21 +1187,25 @@ def api_create_alert():
 
         def _notify():
             if notify_email and email:
-                send_email_notification(email, product["name"], refurb_matches, new_matches)
+                send_email_notification(email, product["name"], refurb_matches, new_matches, retailer_results)
             if notify_sms and phone:
-                send_sms_notification(phone, product["name"], refurb_matches, new_matches)
+                send_sms_notification(phone, product["name"], refurb_matches, new_matches, retailer_results)
 
         threading.Thread(target=_notify, daemon=True).start()
 
         msg_parts = []
         if new_matches:
-            msg_parts.append("available new")
+            msg_parts.append("available new on Apple.com")
         if refurb_matches:
             msg_parts.append(f"{len(refurb_matches)} refurbished listing(s)")
+        for rname, rdata in retailer_results.items():
+            if rdata.get("listings"):
+                label = {"bestbuy": "Best Buy", "bh": "B&H Photo", "swappa": "Swappa"}.get(rname, rname)
+                msg_parts.append(f"{len(rdata['listings'])} at {label}")
 
         return jsonify({
             "status": "available_now",
-            "message": f"{product['name']} is {' and '.join(msg_parts)}! Sending notification...",
+            "message": f"{product['name']} is {', '.join(msg_parts)}! Sending notification...",
             "new_count": len(new_matches),
             "refurb_count": len(refurb_matches),
         })
