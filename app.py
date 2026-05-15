@@ -157,6 +157,9 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+http_session = requests.Session()
+http_session.headers.update(HEADERS)
+
 # ============================================================================
 # Apple Refurbished Scraper
 # ============================================================================
@@ -172,7 +175,7 @@ BOOTSTRAP_RE = re.compile(
 def scrape_refurbished_category(category):
     url = f"{REFURB_BASE}/{category}"
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = http_session.get(url, timeout=10)
         resp.raise_for_status()
         match = BOOTSTRAP_RE.search(resp.text)
         if not match:
@@ -251,7 +254,7 @@ def scrape_buy_page(url, category, label):
     """Scrape an Apple buy page for part numbers and product info."""
     products = []
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp = http_session.get(url, timeout=10)
         resp.raise_for_status()
         html = resp.text
 
@@ -289,11 +292,11 @@ def check_buyability(part_numbers):
         params = {f"parts.{j}": pn for j, pn in enumerate(batch)}
 
         try:
-            resp = requests.get(
+            resp = http_session.get(
                 "https://www.apple.com/shop/buyability-message",
                 params=params,
-                headers={**HEADERS, "Accept": "application/json"},
-                timeout=15,
+                headers={"Accept": "application/json"},
+                timeout=8,
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -382,17 +385,11 @@ def search_bestbuy(query):
     """Search Best Buy for products matching the query."""
     search_url = f"https://www.bestbuy.com/site/searchpage.jsp?st={quote_plus(query)}"
     try:
-        resp = requests.get(search_url, headers={
-            **HEADERS,
-            "Accept": "text/html,application/xhtml+xml",
-        }, timeout=15)
+        resp = http_session.get(search_url, timeout=5)
         if resp.status_code != 200:
             return {"search_url": search_url, "listings": []}
 
         products = []
-
-        # Try to extract product data from Best Buy's embedded JSON or HTML
-        # Best Buy embeds product data in script tags
         sku_title_re = re.compile(
             r'class="sku-title"[^>]*>\s*<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
             re.DOTALL,
@@ -424,16 +421,11 @@ def search_bh(query):
     """Search B&H Photo for products matching the query."""
     search_url = f"https://www.bhphotovideo.com/c/search?q={quote_plus(query)}&filters=fct_brand_name%3Aapple"
     try:
-        resp = requests.get(search_url, headers={
-            **HEADERS,
-            "Accept": "text/html,application/xhtml+xml",
-        }, timeout=15)
+        resp = http_session.get(search_url, timeout=5)
         if resp.status_code != 200:
             return {"search_url": search_url, "listings": []}
 
         products = []
-
-        # B&H Photo: try JSON-LD structured data first
         ld_re = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.DOTALL)
         for m in ld_re.finditer(resp.text):
             try:
@@ -482,17 +474,11 @@ def search_swappa(query):
     """Search Swappa for used/refurbished products matching the query."""
     search_url = f"https://swappa.com/search?q={quote_plus(query)}"
     try:
-        resp = requests.get(search_url, headers={
-            **HEADERS,
-            "Accept": "text/html,application/xhtml+xml",
-        }, timeout=15)
+        resp = http_session.get(search_url, timeout=5)
         if resp.status_code != 200:
             return {"search_url": search_url, "listings": []}
 
         products = []
-
-        # Swappa: try to extract listing data from server-rendered HTML
-        # Look for product cards with title, price, and link
         listing_re = re.compile(
             r'<a[^>]*href="(/listing/[^"]*)"[^>]*>.*?'
             r'<(?:h[2-6]|div|span)[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)</(?:h[2-6]|div|span)>.*?'
@@ -582,7 +568,7 @@ def search_all_retailers(product, memory=None):
         "swappa": search_swappa,
     }
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {}
         for name, fn in retailers.items():
             cached = get_cached_retailer(product_id + cache_suffix, name)
