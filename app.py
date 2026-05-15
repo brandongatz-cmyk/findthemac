@@ -39,8 +39,8 @@ logger = logging.getLogger("findthemac")
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "findthemac.db")
 CHECK_INTERVAL_FREE = int(os.getenv("CHECK_INTERVAL_FREE_MINUTES", "15"))
-CHECK_INTERVAL_STANDARD = int(os.getenv("CHECK_INTERVAL_STANDARD_SECONDS", "90"))
-CHECK_INTERVAL_PREMIUM = int(os.getenv("CHECK_INTERVAL_PREMIUM_SECONDS", "15"))
+CHECK_INTERVAL_PRO = int(os.getenv("CHECK_INTERVAL_PRO_SECONDS", "90"))
+CHECK_INTERVAL_ULTRA = int(os.getenv("CHECK_INTERVAL_ULTRA_SECONDS", "15"))
 
 # ============================================================================
 # Apple product catalog
@@ -950,24 +950,24 @@ def background_monitor():
     time.sleep(10)
 
     free_interval = CHECK_INTERVAL_FREE * 60
-    standard_interval = CHECK_INTERVAL_STANDARD
-    premium_interval = CHECK_INTERVAL_PREMIUM
+    pro_interval = CHECK_INTERVAL_PRO
+    ultra_interval = CHECK_INTERVAL_ULTRA
     refurb_scrape_interval = 120
     new_scrape_interval = 300
 
     time_since_free = free_interval
-    time_since_standard = standard_interval
+    time_since_pro = pro_interval
     time_since_refurb_scrape = refurb_scrape_interval
     time_since_new_scrape = new_scrape_interval
 
     while True:
         try:
-            time_since_refurb_scrape += premium_interval
+            time_since_refurb_scrape += ultra_interval
             if time_since_refurb_scrape >= refurb_scrape_interval:
                 update_refurbished_cache()
                 time_since_refurb_scrape = 0
 
-            time_since_new_scrape += premium_interval
+            time_since_new_scrape += ultra_interval
             if time_since_new_scrape >= new_scrape_interval:
                 update_new_products_cache()
                 time_since_new_scrape = 0
@@ -983,14 +983,14 @@ def background_monitor():
                 ).fetchall()
                 new_products = [dict(r) for r in new_rows]
 
-            process_alerts("premium", refurbished, new_products)
+            process_alerts("ultra", refurbished, new_products)
 
-            time_since_standard += premium_interval
-            if time_since_standard >= standard_interval:
-                process_alerts("standard", refurbished, new_products)
-                time_since_standard = 0
+            time_since_pro += ultra_interval
+            if time_since_pro >= pro_interval:
+                process_alerts("pro", refurbished, new_products)
+                time_since_pro = 0
 
-            time_since_free += premium_interval
+            time_since_free += ultra_interval
             if time_since_free >= free_interval:
                 process_alerts("free", refurbished, new_products)
                 time_since_free = 0
@@ -998,7 +998,7 @@ def background_monitor():
         except Exception as exc:
             logger.error("Monitor error: %s", exc)
 
-        time.sleep(premium_interval)
+        time.sleep(ultra_interval)
 
 
 # ============================================================================
@@ -1146,10 +1146,10 @@ def api_create_alert():
     product = get_product_by_id(product_id)
     if not product:
         return jsonify({"error": "Invalid product"}), 400
-    if tier not in ("free", "standard", "premium"):
+    if tier not in ("free", "pro", "ultra"):
         return jsonify({"error": "Invalid tier."}), 400
     if tier == "free" and notify_sms:
-        return jsonify({"error": "SMS notifications require a paid plan (Standard or Premium)."}), 400
+        return jsonify({"error": "SMS notifications require a paid plan (Pro or Ultra)."}), 400
     if not notify_email and not notify_sms:
         return jsonify({"error": "Select at least one notification method"}), 400
     if notify_email and not email:

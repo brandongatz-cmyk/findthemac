@@ -580,14 +580,14 @@
                         <div class="tier-desc">Email only</div>
                         <span class="tier-badge free-badge">$0</span>
                     </div>
-                    <div class="tier-option paid" data-tier="standard" id="tierStandard">
-                        <div class="tier-name">Standard</div>
+                    <div class="tier-option paid" data-tier="pro" id="tierPro">
+                        <div class="tier-name">Pro</div>
                         <div class="tier-desc">Every 90 sec</div>
                         <div class="tier-desc">Email + SMS</div>
                         <span class="tier-badge paid-badge">$7/mo</span>
                     </div>
-                    <div class="tier-option paid" data-tier="premium" id="tierPremium">
-                        <div class="tier-name">Premium</div>
+                    <div class="tier-option paid" data-tier="ultra" id="tierUltra">
+                        <div class="tier-name">Ultra</div>
                         <div class="tier-desc">Every 15 sec</div>
                         <div class="tier-desc">Email + SMS</div>
                         <span class="tier-badge paid-badge">$14/mo</span>
@@ -760,8 +760,8 @@
         submitAlert.className = 'btn btn-primary';
         selectedTier = 'free';
         document.getElementById('tierFree').classList.add('active');
-        document.getElementById('tierStandard').classList.remove('active');
-        document.getElementById('tierPremium').classList.remove('active');
+        document.getElementById('tierPro').classList.remove('active');
+        document.getElementById('tierUltra').classList.remove('active');
         notifySms.checked = false;
         notifySms.parentElement.style.display = 'none';
         phoneGroup.style.display = 'none';
