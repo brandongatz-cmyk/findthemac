@@ -1,12 +1,129 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FindTheMac — Apple Product Availability Alerts</title>
+    <title>FindTheMac — Apple Product Availability Alerts | In-Stock Tracker</title>
+    <meta name="description" content="Track Apple product availability across 5 retailers. Get instant email and SMS alerts when MacBook, iPhone, iPad, Apple Watch, and more come in stock — new, refurbished, or used. Free 15-minute checks or 15-second Ultra monitoring.">
+    <meta name="keywords" content="Apple stock tracker, MacBook availability, iPhone in stock, refurbished Mac, Apple refurbished alerts, Mac Studio availability, Mac mini stock, Apple product alerts, Best Buy Apple, B&H Photo Apple, Swappa Apple">
+    <link rel="canonical" href="https://findthemac.com/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="FindTheMac">
+    <meta property="og:title" content="FindTheMac — Apple Product In-Stock Alerts">
+    <meta property="og:description" content="Stop refreshing. Get notified the second any Apple product is available — new, refurbished, or used — across Apple, Best Buy, B&H Photo, and Swappa.">
+    <meta property="og:url" content="https://findthemac.com/">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="FindTheMac — Apple Product In-Stock Alerts">
+    <meta name="twitter:description" content="Track Apple availability across 5 retailers. Instant email & SMS alerts in as fast as 15 seconds.">
+
+    <!-- Additional SEO -->
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+    <meta name="author" content="FindTheMac">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="apple-mobile-web-app-title" content="FindTheMac">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "FindTheMac",
+        "url": "https://findthemac.com",
+        "description": "Apple product availability tracker and in-stock alert service. Monitors Apple.com, Best Buy, B&H Photo, and Swappa for new, refurbished, and used Apple products.",
+        "applicationCategory": "ShoppingApplication",
+        "operatingSystem": "Any",
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "Free Plan",
+                "price": "0",
+                "priceCurrency": "USD",
+                "description": "Email alerts every 15 minutes for Apple product availability"
+            },
+            {
+                "@type": "Offer",
+                "name": "Pro Plan",
+                "price": "7.00",
+                "priceCurrency": "USD",
+                "billingIncrement": "P1M",
+                "description": "Email and SMS alerts every 90 seconds"
+            },
+            {
+                "@type": "Offer",
+                "name": "Ultra Plan",
+                "price": "14.00",
+                "priceCurrency": "USD",
+                "billingIncrement": "P1M",
+                "description": "Email and SMS alerts every 15 seconds — fastest tier"
+            }
+        ],
+        "featureList": [
+            "Monitors 5 retailers: Apple, Apple Refurbished, Best Buy, B&H Photo, Swappa",
+            "Tracks 66+ Apple products across 8 categories",
+            "Email alerts with direct purchase links",
+            "SMS alerts with instant notification",
+            "New, refurbished, and used product monitoring",
+            "As fast as 15-second check intervals"
+        ],
+        "creator": {
+            "@type": "Organization",
+            "name": "FindTheMac",
+            "url": "https://findthemac.com"
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "How does FindTheMac track Apple product availability?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "FindTheMac monitors 5 retailers — Apple.com (new and refurbished), Best Buy, B&H Photo, and Swappa — checking inventory as frequently as every 15 seconds on the Ultra plan. When a product you're watching becomes available, you receive an instant email or SMS with a direct link to buy."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Which Apple products can I track?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "FindTheMac tracks over 66 Apple products across 8 categories: Mac (MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, Mac Pro), iPad (iPad, iPad mini, iPad Air, iPad Pro), iPhone, Apple Watch, AirPods, Apple TV, HomePod, and Apple accessories like the Pro Display XDR."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Is FindTheMac free?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. The Free plan gives you email alerts every 15 minutes at no cost. For faster monitoring, the Pro plan ($7/mo) checks every 90 seconds with email and SMS, and the Ultra plan ($14/mo) checks every 15 seconds."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Does FindTheMac track refurbished Apple products?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. FindTheMac monitors the Apple Certified Refurbished store for all product categories including Mac, iPad, iPhone, Apple Watch, AirPods, Apple TV, and HomePod. Refurbished products come with Apple's full warranty and can save you 15–30%."
+                }
+            }
+        ]
+    }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://js.stripe.com">
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -933,6 +1050,66 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        .site-footer {
+            background: var(--ink);
+            color: var(--bg-deep);
+            padding: 48px 24px 32px;
+            margin-top: 48px;
+        }
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 32px;
+        }
+        .footer-brand {
+            font-family: 'Fraunces', serif;
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--bg);
+            margin-bottom: 12px;
+        }
+        .footer-brand .accent { color: var(--terracotta); font-style: italic; }
+        .footer-desc {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--ink-muted);
+            max-width: 380px;
+        }
+        .footer-heading {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--bg);
+            margin-bottom: 14px;
+        }
+        .footer-links {
+            list-style: none;
+            font-size: 13px;
+            line-height: 2;
+        }
+        .footer-links a {
+            color: var(--ink-muted);
+            text-decoration: none;
+        }
+        .footer-links a:hover { color: var(--bg); }
+        .footer-bottom {
+            border-top: 1px solid rgba(245,240,230,0.15);
+            padding-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--ink-muted);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
         @media (max-width: 640px) {
             .hero { padding: 48px 20px 24px; }
             .hero h1 { font-size: 44px; letter-spacing: -1.5px; }
@@ -946,12 +1123,13 @@
             .modal { margin: 12px; }
             .tier-selector { flex-direction: column; }
             .controls-label { font-size: 22px; }
+            .footer-grid { grid-template-columns: 1fr; gap: 24px; }
         }
     </style>
 </head>
 <body>
 
-<header class="header">
+<header class="header" role="banner">
     <div class="header-inner">
         <div class="logo">
             <span class="logo-dot"></span>Find<span class="logo-accent">the</span>Mac
@@ -961,6 +1139,8 @@
         </div>
     </div>
 </header>
+
+<main role="main">
 
 <section class="hero">
     <span class="eyebrow">Apple inventory radar</span>
@@ -1009,6 +1189,43 @@
         <p>Loading Apple product catalog...</p>
     </div>
 </div>
+
+<footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+        <div class="footer-grid">
+            <div>
+                <div class="footer-brand">Find<span class="accent">the</span>Mac</div>
+                <p class="footer-desc">Apple product availability tracker and in-stock alert service. We monitor Apple.com, Apple Refurbished, Best Buy, B&H Photo, and Swappa so you never miss a drop on MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, Mac Pro, iPad, iPhone, Apple Watch, AirPods, Apple TV, or HomePod.</p>
+            </div>
+            <div>
+                <div class="footer-heading">Products We Track</div>
+                <ul class="footer-links">
+                    <li><a href="javascript:void(0)" onclick="document.querySelector('[data-category=mac]').click()">Mac — MacBook, iMac, Mac mini, Mac Studio</a></li>
+                    <li><a href="javascript:void(0)" onclick="document.querySelector('[data-category=ipad]').click()">iPad — Air, Pro, mini</a></li>
+                    <li><a href="javascript:void(0)" onclick="document.querySelector('[data-category=iphone]').click()">iPhone — including Pro &amp; Pro Max</a></li>
+                    <li><a href="javascript:void(0)" onclick="document.querySelector('[data-category=watch]').click()">Apple Watch — SE, Ultra, Series</a></li>
+                    <li><a href="javascript:void(0)" onclick="document.querySelector('[data-category=airpods]').click()">AirPods — Pro, Max</a></li>
+                </ul>
+            </div>
+            <div>
+                <div class="footer-heading">Retailers Monitored</div>
+                <ul class="footer-links">
+                    <li>Apple.com (New)</li>
+                    <li>Apple Certified Refurbished</li>
+                    <li>Best Buy</li>
+                    <li>B&amp;H Photo</li>
+                    <li>Swappa</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2025 FindTheMac. Not affiliated with Apple Inc.</span>
+            <span>Apple, MacBook, iPad, iPhone, and Apple Watch are trademarks of Apple Inc.</span>
+        </div>
+    </div>
+</footer>
+
+</main>
 
 <div class="modal-overlay" id="modalOverlay">
     <div class="modal" id="modal">
@@ -1167,9 +1384,9 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://js.stripe.com/v3/"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js" defer></script>
+<script src="https://js.stripe.com/v3/" defer></script>
 <script>
 (function() {
     'use strict';

@@ -27,10 +27,17 @@ import requests
 import stripe
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request
+from flask_compress import Compress
 
 load_dotenv()
 
 app = Flask(__name__)
+Compress(app)
+app.config["COMPRESS_MIMETYPES"] = [
+    "text/html", "text/css", "text/xml", "text/plain",
+    "application/json", "application/javascript", "application/xml",
+]
+app.config["COMPRESS_MIN_SIZE"] = 500
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1044,9 +1051,146 @@ def background_monitor():
 # API Routes
 # ============================================================================
 
+@app.after_request
+def add_cache_headers(response):
+    path = request.path
+    if path in ("/robots.txt", "/sitemap.xml", "/llms.txt", "/.well-known/ai-plugin.json"):
+        response.headers["Cache-Control"] = "public, max-age=3600"
+    elif path == "/api/products":
+        response.headers["Cache-Control"] = "public, max-age=600"
+    elif path.startswith("/api/inventory"):
+        response.headers["Cache-Control"] = "public, max-age=60"
+    return response
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/robots.txt")
+def robots_txt():
+    txt = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n\n"
+        "User-agent: GPTBot\n"
+        "Allow: /\n"
+        "Allow: /llms.txt\n"
+        "Disallow: /api/\n\n"
+        "User-agent: ChatGPT-User\n"
+        "Allow: /\n\n"
+        "User-agent: Claude-Web\n"
+        "Allow: /\n\n"
+        "User-agent: Applebot-Extended\n"
+        "Allow: /\n\n"
+        "User-agent: PerplexityBot\n"
+        "Allow: /\n\n"
+        "User-agent: Amazonbot\n"
+        "Allow: /\n\n"
+        "Sitemap: https://findthemac.com/sitemap.xml\n"
+    )
+    return app.response_class(txt, mimetype="text/plain")
+
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += "  <url>\n"
+    xml += "    <loc>https://findthemac.com/</loc>\n"
+    xml += "    <changefreq>hourly</changefreq>\n"
+    xml += "    <priority>1.0</priority>\n"
+    xml += "  </url>\n"
+    for product in PRODUCTS:
+        xml += "  <url>\n"
+        xml += f"    <loc>https://findthemac.com/#product-{product['id']}</loc>\n"
+        xml += "    <changefreq>hourly</changefreq>\n"
+        xml += "    <priority>0.8</priority>\n"
+        xml += "  </url>\n"
+    xml += "</urlset>\n"
+    return app.response_class(xml, mimetype="application/xml")
+
+
+@app.route("/llms.txt")
+def llms_txt():
+    categories_text = ", ".join(c["name"] for c in CATEGORIES)
+    product_count = len(PRODUCTS)
+    subcategories = sorted(set(p["subcategory"] for p in PRODUCTS))
+    subcats_text = ", ".join(subcategories)
+
+    txt = f"""# FindTheMac
+
+> Apple product availability tracker and in-stock alert service.
+
+FindTheMac monitors {product_count} Apple products across 5 retailers in real time:
+Apple.com (new), Apple Certified Refurbished, Best Buy, B&H Photo, and Swappa.
+
+## What it does
+
+Users set a watch on any Apple product. When that product appears in stock — new,
+refurbished, or used — they receive an instant email or SMS notification with direct
+purchase links to every retailer carrying it.
+
+## Product categories
+
+{categories_text}
+
+## Subcategories tracked
+
+{subcats_text}
+
+## Monitoring tiers
+
+- **Free** ($0): Email alerts every 15 minutes.
+- **Pro** ($7/mo): Email and SMS alerts every 90 seconds.
+- **Ultra** ($14/mo): Email and SMS alerts every 15 seconds.
+
+## Retailers monitored
+
+1. **Apple.com** — new products via buy pages and buyability API
+2. **Apple Certified Refurbished** — scrapes refurbished store for all categories
+3. **Best Buy** — product search by Apple keyword matching
+4. **B&H Photo** — structured data and product tile scraping
+5. **Swappa** — used and refurbished marketplace listings
+
+## How alerts work
+
+When a monitored product matches a user's watch, FindTheMac sends a notification
+containing direct links to every source where the product was found. For refurbished
+items, the alert includes current price, original price, and savings percentage.
+
+## Technical details
+
+- Built with Python / Flask
+- SQLite database for alerts and product cache
+- Background monitoring thread with decoupled scrape/alert intervals
+- Connection pooling via requests.Session
+- Concurrent retailer search with ThreadPoolExecutor
+- Stripe for subscription payments
+- Firebase Auth for user accounts (Google, Apple, Microsoft, email/password)
+
+## URL
+
+https://findthemac.com
+"""
+    return app.response_class(txt, mimetype="text/plain; charset=utf-8")
+
+
+@app.route("/.well-known/ai-plugin.json")
+def ai_plugin():
+    return jsonify({
+        "schema_version": "v1",
+        "name_for_human": "FindTheMac",
+        "name_for_model": "findthemac",
+        "description_for_human": "Track Apple product availability and get instant alerts when products come in stock.",
+        "description_for_model": "FindTheMac monitors Apple product availability across Apple.com, Apple Refurbished, Best Buy, B&H Photo, and Swappa. It tracks MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, Mac Pro, iPad, iPhone, Apple Watch, AirPods, Apple TV, and HomePod. Users can set alerts with 15-minute (free), 90-second (Pro), or 15-second (Ultra) check intervals. Alerts include direct purchase links.",
+        "auth": {"type": "none"},
+        "api": {"type": "openapi", "url": "https://findthemac.com/api/products"},
+        "logo_url": "https://findthemac.com/static/logo.png",
+        "contact_email": "hello@findthemac.com",
+        "legal_info_url": "https://findthemac.com",
+    })
 
 
 @app.route("/api/products")
