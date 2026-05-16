@@ -659,6 +659,263 @@
         .form-message.success { background: #d4ecd6; color: var(--ink); display: block; }
         .form-message.error { background: #ffdcd0; color: var(--ink); display: block; }
 
+        /* Signup Overlay (layers on top of product modal) */
+        .signup-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10,10,10,0.75);
+            z-index: 300;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .signup-overlay.visible { display: flex; }
+
+        .signup-panel {
+            background: var(--paper);
+            border: 3px solid var(--ink);
+            border-radius: 14px;
+            max-width: 460px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 12px 12px 0 var(--ink);
+            animation: signupSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes signupSlide {
+            from { opacity: 0; transform: translateY(24px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .signup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px 0;
+        }
+        .signup-back {
+            background: none;
+            border: none;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ink-soft);
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .signup-back:hover { color: var(--ink); }
+
+        .signup-body { padding: 16px 24px 24px; }
+
+        .signup-product-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-deep);
+            border: 2px solid var(--ink);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .signup-product-row img {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+        .signup-product-text {
+            flex: 1;
+        }
+        .signup-product-name {
+            font-family: 'Fraunces', serif;
+            font-weight: 700;
+            font-size: 15px;
+            line-height: 1.2;
+        }
+        .signup-tier-label {
+            font-size: 12px;
+            color: var(--ink-soft);
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .signup-tier-price {
+            font-family: 'Fraunces', serif;
+            font-weight: 900;
+            font-size: 18px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        /* Auth step */
+        .signup-step { display: none; }
+        .signup-step.active { display: block; }
+
+        .signup-step-title {
+            font-family: 'Fraunces', serif;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+            margin-bottom: 16px;
+        }
+        .signup-step-title .italic { font-style: italic; color: var(--terracotta); }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 18px 0;
+            font-size: 12px;
+            color: var(--ink-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--ink-muted);
+        }
+
+        .social-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--ink);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin-bottom: 10px;
+            background: var(--paper);
+            color: var(--ink);
+        }
+        .social-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 3px 3px 0 var(--ink);
+        }
+        .social-btn:active {
+            transform: translate(1px, 1px);
+            box-shadow: 0 0 0 var(--ink);
+        }
+        .social-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+        .social-btn.google-btn { background: #fff; }
+        .social-btn.apple-btn { background: #000; color: #fff; border-color: #000; }
+        .social-btn.apple-btn:hover { box-shadow: 3px 3px 0 var(--ink-soft); }
+        .social-btn.microsoft-btn { background: #fff; }
+
+        .auth-toggle {
+            text-align: center;
+            font-size: 13px;
+            color: var(--ink-soft);
+            margin-top: 16px;
+        }
+        .auth-toggle a {
+            color: var(--terracotta);
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+        }
+
+        .auth-email-fields { margin-bottom: 12px; }
+        .auth-email-fields .form-group { margin-bottom: 10px; }
+        .auth-email-fields input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid var(--ink);
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: 'Inter', sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            outline: none;
+            font-weight: 500;
+            transition: box-shadow 0.1s, transform 0.1s;
+        }
+        .auth-email-fields input:focus {
+            box-shadow: 3px 3px 0 var(--terracotta);
+            transform: translate(-1px, -1px);
+        }
+
+        /* Payment step */
+        .stripe-card-container {
+            padding: 14px;
+            border: 2px solid var(--ink);
+            border-radius: 8px;
+            background: var(--paper);
+            transition: box-shadow 0.15s, transform 0.15s;
+            margin-bottom: 6px;
+        }
+        .stripe-card-container.StripeElement--focus {
+            box-shadow: 3px 3px 0 var(--terracotta);
+            transform: translate(-1px, -1px);
+        }
+        .stripe-card-container.StripeElement--invalid {
+            border-color: var(--terracotta);
+        }
+        .card-errors {
+            color: var(--terracotta);
+            font-size: 13px;
+            min-height: 18px;
+            margin-bottom: 12px;
+        }
+
+        .payment-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: var(--bg);
+            border: 2px solid var(--ink);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .payment-amount {
+            font-family: 'Fraunces', serif;
+            font-size: 22px;
+            font-weight: 900;
+        }
+
+        .signup-footer {
+            text-align: center;
+            font-size: 11px;
+            color: var(--ink-muted);
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--bg-deep);
+        }
+
+        .signed-in-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #d4ecd6;
+            border: 2px solid var(--ink);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .signed-in-bar .check { color: var(--leaf); font-size: 16px; }
+
+        @media (max-width: 640px) {
+            .signup-panel { margin: 8px; border-width: 2px; box-shadow: 8px 8px 0 var(--ink); }
+            .signup-body { padding: 14px 18px 20px; }
+        }
+
         .loading {
             text-align: center;
             padding: 60px;
@@ -772,14 +1029,14 @@
             </div>
 
             <div class="alert-form" id="alertForm">
-                <h3 id="alertFormTitle">Tell me <span class="italic">the second</span> it lands</h3>
+                <h3 id="alertFormTitle">Choose <span class="italic">your watch</span></h3>
 
-                <div class="tier-selector">
-                    <div class="tier-option active" data-tier="free" id="tierFree">
+                <div class="tier-selector" id="tierSelector">
+                    <div class="tier-option" data-tier="free" id="tierFree">
                         <div class="tier-name">Free</div>
                         <div class="tier-desc">Every 15 min</div>
                         <div class="tier-desc">Email only</div>
-                        <span class="tier-badge free-badge">$0</span>
+                        <span class="tier-badge free-badge">Get Started</span>
                     </div>
                     <div class="tier-option paid" data-tier="pro" id="tierPro">
                         <div class="tier-name">Pro</div>
@@ -794,38 +1051,125 @@
                         <span class="tier-badge paid-badge">$14/mo</span>
                     </div>
                 </div>
-
-                <div class="checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="notifyEmail" checked>
-                        Email
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="notifySms">
-                        Text Message (SMS)
-                    </label>
-                </div>
-
-                <div class="form-group" id="emailGroup">
-                    <label for="emailInput">Email Address</label>
-                    <input type="email" id="emailInput" placeholder="you@example.com">
-                </div>
-
-                <div class="form-group" id="phoneGroup" style="display:none;">
-                    <label for="phoneInput">Phone Number</label>
-                    <input type="tel" id="phoneInput" placeholder="+1 (555) 123-4567">
-                </div>
-
-                <button class="btn btn-primary" id="submitAlert">
-                    Watch For Drop
-                </button>
-
-                <div class="form-message" id="formMessage"></div>
             </div>
         </div>
     </div>
 </div>
 
+<div class="signup-overlay" id="signupOverlay">
+    <div class="signup-panel">
+        <div class="signup-header">
+            <button class="signup-back" id="signupBack">&larr; Back</button>
+            <button class="modal-close" id="signupClose">&times;</button>
+        </div>
+        <div class="signup-body">
+            <div class="signup-product-row" id="signupProductRow">
+                <img src="" alt="" id="signupProductImg">
+                <div class="signup-product-text">
+                    <div class="signup-product-name" id="signupProductName"></div>
+                    <div class="signup-tier-label" id="signupTierLabel"></div>
+                </div>
+                <div class="signup-tier-price" id="signupTierPrice"></div>
+            </div>
+
+            <!-- Step 1: Auth -->
+            <div class="signup-step active" id="signupStepAuth">
+                <div class="signup-step-title">Create an <span class="italic">account</span></div>
+
+                <div class="auth-email-fields">
+                    <div class="form-group">
+                        <label for="authEmail">Email</label>
+                        <input type="email" id="authEmail" placeholder="you@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="authPassword">Password</label>
+                        <input type="password" id="authPassword" placeholder="At least 6 characters">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="authEmailBtn">Create Account</button>
+
+                <div class="auth-divider">or continue with</div>
+
+                <button class="social-btn google-btn" id="authGoogle">
+                    <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                    Continue with Google
+                </button>
+
+                <button class="social-btn apple-btn" id="authApple">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.23 0-1.44.64-2.2.45-3.07-.4C3.79 16.17 4.36 9.04 8.93 8.78c1.27.07 2.16.72 2.91.76.98-.2 1.92-.77 2.98-.7 1.27.1 2.22.6 2.84 1.52-2.6 1.54-1.98 4.93.37 5.88-.46 1.2-.67 1.74-1.25 2.78-.85 1.52-2.04 3.04-3.73 3.26zm-.1-14.83c-.2 1.64-1.62 3.25-3.37 3.06-.21-1.6 1.6-3.33 3.37-3.06z"/></svg>
+                    Continue with Apple
+                </button>
+
+                <button class="social-btn microsoft-btn" id="authMicrosoft">
+                    <svg viewBox="0 0 24 24"><rect x="1" y="1" width="10" height="10" fill="#F25022"/><rect x="13" y="1" width="10" height="10" fill="#7FBA00"/><rect x="1" y="13" width="10" height="10" fill="#00A4EF"/><rect x="13" y="13" width="10" height="10" fill="#FFB900"/></svg>
+                    Continue with Microsoft
+                </button>
+
+                <div class="auth-toggle" id="authToggle">
+                    Already have an account? <a id="authToggleLink">Sign in</a>
+                </div>
+
+                <div class="form-message" id="authMessage"></div>
+            </div>
+
+            <!-- Step 2: Details + Payment -->
+            <div class="signup-step" id="signupStepDetails">
+                <div class="signed-in-bar" id="signedInBar">
+                    <span class="check">&#10003;</span>
+                    <span id="signedInEmail">user@email.com</span>
+                </div>
+
+                <div class="signup-step-title" id="detailsTitle">Set <span class="italic">your alert</span></div>
+
+                <div class="form-group" id="signupEmailGroup" style="display:none;">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" placeholder="you@example.com" style="width:100%;padding:12px 14px;border:2px solid var(--ink);border-radius:8px;font-size:15px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);outline:none;font-weight:500;">
+                </div>
+
+                <div class="checkbox-group" id="signupNotifyGroup">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="signupNotifyEmail" checked>
+                        Email
+                    </label>
+                    <label class="checkbox-label" id="signupSmsLabel" style="display:none;">
+                        <input type="checkbox" id="signupNotifySms">
+                        SMS
+                    </label>
+                </div>
+
+                <div class="form-group" id="signupPhoneGroup" style="display:none;">
+                    <label for="signupPhone">Phone Number</label>
+                    <input type="tel" id="signupPhone" placeholder="+1 (555) 123-4567" style="width:100%;padding:12px 14px;border:2px solid var(--ink);border-radius:8px;font-size:15px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);outline:none;font-weight:500;">
+                </div>
+
+                <div id="signupPaymentSection" style="display:none;">
+                    <div class="form-group">
+                        <label>Card Details</label>
+                        <div class="stripe-card-container" id="stripeCardElement"></div>
+                        <div class="card-errors" id="cardErrors"></div>
+                    </div>
+                    <div class="payment-summary" id="paymentSummary">
+                        <span>Monthly subscription</span>
+                        <span class="payment-amount" id="paymentAmount">$7/mo</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="signupSubmit">Set Free Alert</button>
+
+                <div class="form-message" id="signupMessage"></div>
+
+                <div class="signup-footer" id="signupFooter" style="display:none;">
+                    Payments processed securely by Stripe. Cancel anytime.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
 <script>
 (function() {
     'use strict';
@@ -839,6 +1183,15 @@
     let activeMemory = '';
     let defaultView = true;
 
+    // Auth + payment state
+    let currentUser = null;   // { user_id, email, display_name, phone }
+    let firebaseApp = null;
+    let firebaseAuth = null;
+    let stripeInstance = null;
+    let cardElement = null;
+    let appConfig = null;
+    let authIsSignIn = false; // false = create account, true = sign in
+
     const productGrid = document.getElementById('productGrid');
     const searchInput = document.getElementById('searchInput');
     const filterTabs = document.getElementById('filterTabs');
@@ -850,23 +1203,29 @@
     const memoryTabs = document.getElementById('memoryTabs');
     const modalTitle = document.getElementById('modalTitle');
     const alertFormTitle = document.getElementById('alertFormTitle');
-    const notifyEmail = document.getElementById('notifyEmail');
-    const notifySms = document.getElementById('notifySms');
-    const emailGroup = document.getElementById('emailGroup');
-    const phoneGroup = document.getElementById('phoneGroup');
-    const emailInput = document.getElementById('emailInput');
-    const phoneInput = document.getElementById('phoneInput');
-    const submitAlert = document.getElementById('submitAlert');
-    const formMessage = document.getElementById('formMessage');
+
+    // Signup overlay elements
+    const signupOverlay = document.getElementById('signupOverlay');
+    const signupBack = document.getElementById('signupBack');
+    const signupClose = document.getElementById('signupClose');
+    const signupStepAuth = document.getElementById('signupStepAuth');
+    const signupStepDetails = document.getElementById('signupStepDetails');
+    const signupSubmit = document.getElementById('signupSubmit');
+    const signupMessage = document.getElementById('signupMessage');
+    const authMessage = document.getElementById('authMessage');
+
+    // ── Init ──────────────────────────────────────────────────────────────
 
     async function init() {
         try {
-            const [prodRes, summaryRes] = await Promise.all([
+            const [prodRes, summaryRes, configRes] = await Promise.all([
                 fetch('/api/products'),
                 fetch('/api/inventory/summary'),
+                fetch('/api/config'),
             ]);
             const prodData = await prodRes.json();
             const summaryData = await summaryRes.json();
+            appConfig = await configRes.json();
 
             allProducts = prodData.products;
             categories = prodData.categories;
@@ -874,10 +1233,49 @@
             renderFilterTabs();
             renderProducts();
             updateHeaderStats(summaryData);
+
+            initFirebase();
+            initStripe();
         } catch (err) {
             productGrid.innerHTML = '<div class="no-results"><h3>Failed to load products</h3><p>Please refresh the page.</p></div>';
         }
     }
+
+    function initFirebase() {
+        if (!appConfig || !appConfig.has_firebase || !appConfig.firebase.apiKey) return;
+        try {
+            firebaseApp = firebase.initializeApp(appConfig.firebase);
+            firebaseAuth = firebase.auth();
+            firebaseAuth.onAuthStateChanged(function(user) {
+                if (user) {
+                    user.getIdToken().then(function(token) {
+                        return fetch('/api/auth/session', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id_token: token }),
+                        });
+                    }).then(function(r) { return r.json(); }).then(function(data) {
+                        if (data.user_id) {
+                            currentUser = data;
+                        }
+                    }).catch(function() {});
+                }
+            });
+        } catch (e) {
+            console.warn('Firebase init failed:', e);
+        }
+    }
+
+    function initStripe() {
+        if (!appConfig || !appConfig.stripe_publishable_key) return;
+        try {
+            stripeInstance = Stripe(appConfig.stripe_publishable_key);
+        } catch (e) {
+            console.warn('Stripe init failed:', e);
+        }
+    }
+
+    // ── Header / Grid / Filters (unchanged logic) ────────────────────────
 
     function updateHeaderStats(s) {
         var parts = [];
@@ -954,24 +1352,13 @@
         });
     }
 
+    // ── Product Modal ─────────────────────────────────────────────────────
+
     async function openModal(productId) {
         selectedProduct = allProducts.find(function(p) { return p.id === productId; });
         if (!selectedProduct) return;
 
         var catInfo = categories.find(function(c) { return c.id === selectedProduct.category; }) || {};
-
-        formMessage.className = 'form-message';
-        formMessage.style.display = 'none';
-        submitAlert.disabled = false;
-        submitAlert.textContent = 'Watch For Drop';
-        submitAlert.className = 'btn btn-primary';
-        selectedTier = 'free';
-        document.getElementById('tierFree').classList.add('active');
-        document.getElementById('tierPro').classList.remove('active');
-        document.getElementById('tierUltra').classList.remove('active');
-        notifySms.checked = false;
-        notifySms.parentElement.style.display = 'none';
-        phoneGroup.style.display = 'none';
 
         modalTitle.textContent = 'Set the watch';
         modalProduct.innerHTML =
@@ -989,7 +1376,7 @@
                 '<p style="font-size:13px;">Checking inventory across all stores...</p>' +
             '</div>';
 
-        alertFormTitle.innerHTML = 'Tell me <span class="italic">the second</span> it lands';
+        alertFormTitle.innerHTML = 'Choose <span class="italic">your watch</span>';
 
         modalOverlay.classList.add('visible');
 
@@ -1002,7 +1389,6 @@
             var html = '';
             var anyAvailable = false;
 
-            // New (Apple Store)
             if (data.new && data.new.available && data.new.listings.length > 0) {
                 anyAvailable = true;
                 var seenUrls = {};
@@ -1010,100 +1396,44 @@
                 data.new.listings.forEach(function(item) {
                     if (!seenUrls[item.url]) {
                         seenUrls[item.url] = true;
-                        html += '<div class="avail-item">' +
-                            '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
-                            '<div class="avail-item-price" style="color:var(--blue);">Buy New</div>' +
-                        '</div>';
+                        html += '<div class="avail-item"><div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div><div class="avail-item-price" style="color:var(--cobalt);">Buy New</div></div>';
                     }
                 });
                 html += '</div>';
             }
 
-            // Refurbished (Apple Store)
             if (data.refurbished && data.refurbished.available && data.refurbished.listings.length > 0) {
                 anyAvailable = true;
-                html += '<div class="avail-section avail-refurb"><h4>Available on Apple Refurbished (' + data.refurbished.count + ' listing' + (data.refurbished.count !== 1 ? 's' : '') + ')</h4>';
+                html += '<div class="avail-section avail-refurb"><h4>Apple Refurbished (' + data.refurbished.count + ')</h4>';
                 data.refurbished.listings.slice(0, 5).forEach(function(item) {
-                    html += '<div class="avail-item">' +
-                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
-                        '<div class="avail-item-price">$' + item.price + '</div>' +
-                    '</div>';
+                    html += '<div class="avail-item"><div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div><div class="avail-item-price">$' + item.price + '</div></div>';
                 });
-                if (data.refurbished.count > 5) {
-                    html += '<div style="text-align:center;padding-top:8px;font-size:13px;color:var(--text-secondary);">+ ' + (data.refurbished.count - 5) + ' more</div>';
+                if (data.refurbished.count > 5) html += '<div style="text-align:center;padding-top:8px;font-size:13px;color:var(--ink-muted);">+ ' + (data.refurbished.count - 5) + ' more</div>';
+                html += '</div>';
+            }
+
+            ['bestbuy', 'bh', 'swappa'].forEach(function(key) {
+                var names = { bestbuy: 'Best Buy', bh: 'B&H Photo', swappa: 'Swappa' };
+                var cls = { bestbuy: 'avail-bestbuy', bh: 'avail-bh', swappa: 'avail-swappa' };
+                if (data[key] && data[key].available && data[key].listings.length > 0) {
+                    anyAvailable = true;
+                    html += '<div class="avail-section ' + cls[key] + '"><h4>' + names[key] + ' (' + data[key].count + ')</h4>';
+                    data[key].listings.slice(0, 5).forEach(function(item) {
+                        html += '<div class="avail-item"><div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div><div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div></div>';
+                    });
+                    html += '</div>';
                 }
-                html += '</div>';
-            }
-
-            // Best Buy
-            if (data.bestbuy && data.bestbuy.available && data.bestbuy.listings.length > 0) {
-                anyAvailable = true;
-                html += '<div class="avail-section avail-bestbuy"><h4>Available at Best Buy (' + data.bestbuy.count + ' listing' + (data.bestbuy.count !== 1 ? 's' : '') + ')</h4>';
-                data.bestbuy.listings.slice(0, 5).forEach(function(item) {
-                    html += '<div class="avail-item">' +
-                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
-                        '<div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div>' +
-                    '</div>';
-                });
-                html += '</div>';
-            }
-
-            // B&H Photo
-            if (data.bh && data.bh.available && data.bh.listings.length > 0) {
-                anyAvailable = true;
-                html += '<div class="avail-section avail-bh"><h4>Available at B&amp;H Photo (' + data.bh.count + ' listing' + (data.bh.count !== 1 ? 's' : '') + ')</h4>';
-                data.bh.listings.slice(0, 5).forEach(function(item) {
-                    html += '<div class="avail-item">' +
-                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
-                        '<div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div>' +
-                    '</div>';
-                });
-                html += '</div>';
-            }
-
-            // Swappa
-            if (data.swappa && data.swappa.available && data.swappa.listings.length > 0) {
-                anyAvailable = true;
-                html += '<div class="avail-section avail-swappa"><h4>Available on Swappa (' + data.swappa.count + ' listing' + (data.swappa.count !== 1 ? 's' : '') + ')</h4>';
-                data.swappa.listings.slice(0, 5).forEach(function(item) {
-                    html += '<div class="avail-item">' +
-                        '<div class="avail-item-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div>' +
-                        '<div class="avail-item-price">' + (item.price ? '$' + item.price : 'See Price') + '</div>' +
-                    '</div>';
-                });
-                html += '</div>';
-            }
-
-            // Search links for retailers that had no results
-            var searchLinks = [];
-            if (data.bestbuy && !data.bestbuy.available && data.bestbuy.search_url) {
-                searchLinks.push('<a href="' + data.bestbuy.search_url + '" target="_blank" rel="noopener" style="color:#f57f17;">Best Buy</a>');
-            }
-            if (data.bh && !data.bh.available && data.bh.search_url) {
-                searchLinks.push('<a href="' + data.bh.search_url + '" target="_blank" rel="noopener" style="color:#c62828;">B&amp;H Photo</a>');
-            }
-            if (data.swappa && !data.swappa.available && data.swappa.search_url) {
-                searchLinks.push('<a href="' + data.swappa.search_url + '" target="_blank" rel="noopener" style="color:var(--purple);">Swappa</a>');
-            }
-            if (searchLinks.length > 0) {
-                html += '<div style="text-align:center;font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Search directly: ' + searchLinks.join(' &middot; ') + '</div>';
-            }
+            });
 
             if (anyAvailable) {
                 modalAvailStatus.innerHTML = html;
-                alertFormTitle.innerHTML = 'Available <span class="italic">now</span> &mdash; want a copy?';
-                submitAlert.textContent = 'Send Me The Links';
-                submitAlert.className = 'btn btn-success';
+                alertFormTitle.innerHTML = 'Available <span class="italic">now</span> — set an alert';
             } else {
                 modalAvailStatus.innerHTML =
-                    '<div class="not-available-msg">' +
-                        'Not currently found across any stores we monitor.<br>' +
-                        '<strong>Set an alert below</strong> and we\'ll notify you when it appears!' +
-                    '</div>';
+                    '<div class="not-available-msg">Not currently found across any stores we monitor.<br><strong>Pick a plan below</strong> and we\'ll notify you when it appears!</div>';
             }
         } catch (e) {
-            modalAvailStatus.innerHTML =
-                '<div class="not-available-msg">Could not check availability. Set an alert to be notified.</div>';
+            modalAvailStatus.innerHTML = '<div class="not-available-msg">Could not check availability. Pick a plan to be notified.</div>';
         }
     }
 
@@ -1117,7 +1447,10 @@
         if (e.target === modalOverlay) closeModal();
     });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') {
+            if (signupOverlay.classList.contains('visible')) closeSignup();
+            else closeModal();
+        }
     });
 
     // Memory filter tabs
@@ -1132,9 +1465,9 @@
                 memoryTabs.querySelectorAll('.memory-tab').forEach(function(t) { t.classList.remove('active'); });
                 tab.classList.add('active');
             }
-            // Switch to Mac category and set search
             if (activeMemory) {
                 activeCategory = 'mac';
+                defaultView = false;
                 filterTabs.querySelectorAll('.filter-tab').forEach(function(t) {
                     t.classList.toggle('active', t.dataset.category === 'mac');
                 });
@@ -1148,96 +1481,413 @@
         });
     });
 
-    var tierButtons = document.querySelectorAll('.tier-option');
-    tierButtons.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            selectedTier = btn.dataset.tier;
-            tierButtons.forEach(function(b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            if (selectedTier === 'free') {
-                notifySms.checked = false;
-                notifySms.parentElement.style.display = 'none';
-                phoneGroup.style.display = 'none';
-            } else {
-                notifySms.parentElement.style.display = 'flex';
+    // ── Tier cards → open signup overlay ───────────────────────────────────
+
+    document.getElementById('tierSelector').addEventListener('click', function(e) {
+        var card = e.target.closest('.tier-option');
+        if (!card || !selectedProduct) return;
+        openSignup(card.dataset.tier);
+    });
+
+    // ── Signup Overlay ────────────────────────────────────────────────────
+
+    function openSignup(tier) {
+        selectedTier = tier;
+
+        // Populate product row
+        document.getElementById('signupProductImg').src = selectedProduct.image;
+        document.getElementById('signupProductName').textContent = selectedProduct.name;
+
+        var tierInfo = { free: ['Free · 15 min · Email', '$0'], pro: ['Pro · 90 sec · Email + SMS', '$7/mo'], ultra: ['Ultra · 15 sec · Email + SMS', '$14/mo'] };
+        var info = tierInfo[tier] || tierInfo.free;
+        document.getElementById('signupTierLabel').textContent = info[0];
+        document.getElementById('signupTierPrice').textContent = info[1];
+
+        // Reset messages
+        authMessage.className = 'form-message';
+        authMessage.style.display = 'none';
+        signupMessage.className = 'form-message';
+        signupMessage.style.display = 'none';
+
+        // Decide which step to show
+        if (currentUser) {
+            showStep('details');
+        } else if (appConfig && appConfig.has_firebase) {
+            showStep('auth');
+        } else {
+            // No Firebase configured — skip auth, go straight to details
+            showStep('details');
+        }
+
+        signupOverlay.classList.add('visible');
+    }
+
+    function showStep(step) {
+        signupStepAuth.classList.toggle('active', step === 'auth');
+        signupStepDetails.classList.toggle('active', step === 'details');
+
+        if (step === 'details') {
+            setupDetailsStep();
+        }
+    }
+
+    function setupDetailsStep() {
+        var isPaid = selectedTier !== 'free';
+        var smsLabel = document.getElementById('signupSmsLabel');
+        var phoneGroup = document.getElementById('signupPhoneGroup');
+        var paymentSection = document.getElementById('signupPaymentSection');
+        var footer = document.getElementById('signupFooter');
+        var notifySms = document.getElementById('signupNotifySms');
+        var notifyEmail = document.getElementById('signupNotifyEmail');
+
+        // Show signed-in bar or email field
+        var signedInBar = document.getElementById('signedInBar');
+        var emailGroup = document.getElementById('signupEmailGroup');
+        if (currentUser && currentUser.email) {
+            document.getElementById('signedInEmail').textContent = currentUser.email;
+            signedInBar.style.display = 'flex';
+            emailGroup.style.display = 'none';
+        } else {
+            signedInBar.style.display = 'none';
+            emailGroup.style.display = 'block';
+        }
+
+        // Notification options
+        notifyEmail.checked = true;
+        if (isPaid) {
+            smsLabel.style.display = 'flex';
+            notifySms.checked = true;
+            phoneGroup.style.display = 'block';
+        } else {
+            smsLabel.style.display = 'none';
+            notifySms.checked = false;
+            phoneGroup.style.display = 'none';
+        }
+
+        // Payment section
+        if (isPaid && appConfig && appConfig.has_stripe && stripeInstance) {
+            paymentSection.style.display = 'block';
+            footer.style.display = 'block';
+            var amount = selectedTier === 'ultra' ? '$14/mo' : '$7/mo';
+            document.getElementById('paymentAmount').textContent = amount;
+            signupSubmit.textContent = 'Subscribe — ' + amount;
+
+            // Mount Stripe card element
+            if (cardElement) {
+                cardElement.unmount();
+                cardElement.destroy();
             }
-        });
+            var elements = stripeInstance.elements();
+            cardElement = elements.create('card', {
+                style: {
+                    base: {
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        fontSize: '15px',
+                        color: '#0a0a0a',
+                        '::placeholder': { color: '#8a8074' },
+                    },
+                    invalid: { color: '#d6411a' },
+                },
+            });
+            cardElement.mount('#stripeCardElement');
+            cardElement.on('change', function(event) {
+                document.getElementById('cardErrors').textContent = event.error ? event.error.message : '';
+            });
+        } else if (isPaid) {
+            paymentSection.style.display = 'none';
+            footer.style.display = 'block';
+            footer.textContent = 'Payment processing coming soon. Set a free alert for now.';
+            signupSubmit.textContent = 'Set Free Alert Instead';
+            selectedTier = 'free';
+        } else {
+            paymentSection.style.display = 'none';
+            footer.style.display = 'none';
+            signupSubmit.textContent = 'Set Free Alert';
+        }
+
+        signupSubmit.disabled = false;
+    }
+
+    function closeSignup() {
+        signupOverlay.classList.remove('visible');
+        if (cardElement) {
+            cardElement.unmount();
+            cardElement.destroy();
+            cardElement = null;
+        }
+    }
+
+    signupBack.addEventListener('click', closeSignup);
+    signupClose.addEventListener('click', function() {
+        closeSignup();
+        closeModal();
+    });
+    signupOverlay.addEventListener('click', function(e) {
+        if (e.target === signupOverlay) closeSignup();
     });
 
-    notifyEmail.addEventListener('change', function() {
-        emailGroup.style.display = notifyEmail.checked ? 'block' : 'none';
-    });
-    notifySms.addEventListener('change', function() {
-        phoneGroup.style.display = notifySms.checked ? 'block' : 'none';
+    // SMS toggle → show/hide phone field
+    document.getElementById('signupNotifySms').addEventListener('change', function() {
+        document.getElementById('signupPhoneGroup').style.display = this.checked ? 'block' : 'none';
     });
 
-    submitAlert.addEventListener('click', async function() {
+    // ── Auth step handlers ────────────────────────────────────────────────
+
+    document.getElementById('authToggleLink').addEventListener('click', function() {
+        authIsSignIn = !authIsSignIn;
+        document.getElementById('authEmailBtn').textContent = authIsSignIn ? 'Sign In' : 'Create Account';
+        document.getElementById('authToggle').innerHTML = authIsSignIn
+            ? 'Don\'t have an account? <a id="authToggleLink">Create one</a>'
+            : 'Already have an account? <a id="authToggleLink">Sign in</a>';
+        document.getElementById('authToggleLink').addEventListener('click', arguments.callee);
+        var stepTitle = document.querySelector('#signupStepAuth .signup-step-title');
+        stepTitle.innerHTML = authIsSignIn
+            ? 'Sign <span class="italic">in</span>'
+            : 'Create an <span class="italic">account</span>';
+        authMessage.style.display = 'none';
+    });
+
+    // Email/password auth
+    document.getElementById('authEmailBtn').addEventListener('click', async function() {
+        if (!firebaseAuth) {
+            showAuthMsg('error', 'Authentication is not configured.');
+            return;
+        }
+        var email = document.getElementById('authEmail').value.trim();
+        var password = document.getElementById('authPassword').value;
+        if (!email || !isValidEmail(email)) {
+            showAuthMsg('error', 'Please enter a valid email.');
+            return;
+        }
+        if (!password || password.length < 6) {
+            showAuthMsg('error', 'Password must be at least 6 characters.');
+            return;
+        }
+
+        this.disabled = true;
+        this.textContent = authIsSignIn ? 'Signing in...' : 'Creating account...';
+
+        try {
+            var result;
+            if (authIsSignIn) {
+                result = await firebaseAuth.signInWithEmailAndPassword(email, password);
+            } else {
+                result = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+            }
+            await handleFirebaseUser(result.user);
+        } catch (e) {
+            var msg = e.message || 'Authentication failed.';
+            if (e.code === 'auth/email-already-in-use') msg = 'Email already registered. Try signing in.';
+            if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') msg = 'Invalid email or password.';
+            if (e.code === 'auth/invalid-credential') msg = 'Invalid email or password.';
+            showAuthMsg('error', msg);
+            this.disabled = false;
+            this.textContent = authIsSignIn ? 'Sign In' : 'Create Account';
+        }
+    });
+
+    // Social auth buttons
+    document.getElementById('authGoogle').addEventListener('click', function() {
+        socialAuth(new firebase.auth.GoogleAuthProvider());
+    });
+    document.getElementById('authApple').addEventListener('click', function() {
+        socialAuth(new firebase.auth.OAuthProvider('apple.com'));
+    });
+    document.getElementById('authMicrosoft').addEventListener('click', function() {
+        socialAuth(new firebase.auth.OAuthProvider('microsoft.com'));
+    });
+
+    async function socialAuth(provider) {
+        if (!firebaseAuth) {
+            showAuthMsg('error', 'Authentication is not configured.');
+            return;
+        }
+        try {
+            var result = await firebaseAuth.signInWithPopup(provider);
+            await handleFirebaseUser(result.user);
+        } catch (e) {
+            if (e.code !== 'auth/popup-closed-by-user') {
+                showAuthMsg('error', e.message || 'Sign-in failed.');
+            }
+        }
+    }
+
+    async function handleFirebaseUser(user) {
+        try {
+            var token = await user.getIdToken();
+            var res = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_token: token }),
+            });
+            var data = await res.json();
+            if (data.user_id) {
+                currentUser = data;
+                showStep('details');
+            } else {
+                showAuthMsg('error', data.error || 'Could not create session.');
+            }
+        } catch (e) {
+            showAuthMsg('error', 'Network error. Please try again.');
+        }
+    }
+
+    function showAuthMsg(type, msg) {
+        authMessage.className = 'form-message ' + type;
+        authMessage.textContent = msg;
+        authMessage.style.display = 'block';
+    }
+
+    // ── Signup submit (details step) ──────────────────────────────────────
+
+    signupSubmit.addEventListener('click', async function() {
         if (!selectedProduct) return;
 
-        var wantEmail = notifyEmail.checked;
-        var wantSms = notifySms.checked;
-        var email = emailInput.value.trim();
-        var phone = phoneInput.value.trim();
+        var wantEmail = document.getElementById('signupNotifyEmail').checked;
+        var wantSms = document.getElementById('signupNotifySms').checked;
+        var phone = document.getElementById('signupPhone').value.trim();
+        var email = currentUser ? currentUser.email :
+            (document.getElementById('signupEmail').value.trim() || document.getElementById('authEmail').value.trim());
+        var isPaid = selectedTier !== 'free';
 
         if (!wantEmail && !wantSms) {
-            showMessage('error', 'Please select at least one notification method.');
+            showSignupMsg('error', 'Select at least one notification method.');
             return;
         }
-        if (wantEmail && !email) {
-            showMessage('error', 'Please enter your email address.');
-            return;
-        }
-        if (wantEmail && !isValidEmail(email)) {
-            showMessage('error', 'Please enter a valid email address.');
+        if (!email || !isValidEmail(email)) {
+            showSignupMsg('error', 'Valid email required.');
             return;
         }
         if (wantSms && !phone) {
-            showMessage('error', 'Please enter your phone number.');
+            showSignupMsg('error', 'Phone number required for SMS.');
             return;
         }
 
-        submitAlert.disabled = true;
-        submitAlert.textContent = 'Setting up alert...';
+        signupSubmit.disabled = true;
+        signupSubmit.textContent = isPaid ? 'Processing payment...' : 'Setting alert...';
 
-        try {
-            var res = await fetch('/api/alerts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    product_id: selectedProduct.id,
-                    email: email,
-                    phone: phone,
-                    notify_email: wantEmail,
-                    notify_sms: wantSms,
-                    tier: selectedTier,
-                }),
-            });
+        if (isPaid && stripeInstance && cardElement) {
+            // Stripe payment flow
+            try {
+                var pmResult = await stripeInstance.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                    billing_details: { email: email },
+                });
 
-            var data = await res.json();
+                if (pmResult.error) {
+                    showSignupMsg('error', pmResult.error.message);
+                    signupSubmit.disabled = false;
+                    signupSubmit.textContent = 'Subscribe — ' + (selectedTier === 'ultra' ? '$14/mo' : '$7/mo');
+                    return;
+                }
 
-            if (!res.ok) {
-                showMessage('error', data.error || 'Something went wrong.');
-                submitAlert.disabled = false;
-                submitAlert.textContent = 'Watch For Drop';
-                return;
+                var subRes = await fetch('/api/create-subscription', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        payment_method_id: pmResult.paymentMethod.id,
+                        email: email,
+                        phone: phone,
+                        product_id: selectedProduct.id,
+                        tier: selectedTier,
+                        notify_email: wantEmail,
+                        notify_sms: wantSms,
+                        user_id: currentUser ? currentUser.user_id : '',
+                    }),
+                });
+
+                var subData = await subRes.json();
+
+                if (!subRes.ok) {
+                    showSignupMsg('error', subData.error || 'Payment failed.');
+                    signupSubmit.disabled = false;
+                    signupSubmit.textContent = 'Subscribe — ' + (selectedTier === 'ultra' ? '$14/mo' : '$7/mo');
+                    return;
+                }
+
+                if (subData.status === 'requires_action') {
+                    signupSubmit.textContent = 'Confirming payment...';
+                    var confirmResult = await stripeInstance.confirmCardPayment(subData.client_secret);
+                    if (confirmResult.error) {
+                        showSignupMsg('error', confirmResult.error.message);
+                        signupSubmit.disabled = false;
+                        signupSubmit.textContent = 'Subscribe — ' + (selectedTier === 'ultra' ? '$14/mo' : '$7/mo');
+                        return;
+                    }
+                    // Confirm on backend
+                    await fetch('/api/confirm-subscription', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            subscription_id: subData.subscription_id,
+                            customer_id: subData.customer_id,
+                            product_id: selectedProduct.id,
+                            email: email,
+                            phone: phone,
+                            tier: selectedTier,
+                            notify_email: wantEmail,
+                            notify_sms: wantSms,
+                            user_id: currentUser ? currentUser.user_id : '',
+                        }),
+                    });
+                }
+
+                showSignupMsg('success', subData.message || 'Subscribed! Alert is active.');
+                signupSubmit.textContent = 'Done!';
+
+            } catch (e) {
+                showSignupMsg('error', 'Payment error. Please try again.');
+                signupSubmit.disabled = false;
+                signupSubmit.textContent = 'Subscribe — ' + (selectedTier === 'ultra' ? '$14/mo' : '$7/mo');
             }
+        } else {
+            // Free tier — create alert directly
+            try {
+                var res = await fetch('/api/alerts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_id: selectedProduct.id,
+                        email: email,
+                        phone: phone,
+                        notify_email: wantEmail,
+                        notify_sms: wantSms,
+                        tier: 'free',
+                        user_id: currentUser ? currentUser.user_id : '',
+                    }),
+                });
 
-            if (data.status === 'available_now') {
-                showMessage('success', 'This product is available now! Notification sent. Check your ' +
-                    (wantEmail ? 'inbox' : '') +
-                    (wantEmail && wantSms ? ' and ' : '') +
-                    (wantSms ? 'phone' : '') + '.');
-            } else {
-                showMessage('success', 'Alert set! We\'ll notify you when ' + selectedProduct.name + ' becomes available.');
+                var data = await res.json();
+                if (!res.ok) {
+                    showSignupMsg('error', data.error || 'Something went wrong.');
+                    signupSubmit.disabled = false;
+                    signupSubmit.textContent = 'Set Free Alert';
+                    return;
+                }
+
+                if (data.status === 'available_now') {
+                    showSignupMsg('success', 'Available now! Notification sent — check your inbox.');
+                } else {
+                    showSignupMsg('success', 'Alert set! We\'ll notify you when ' + selectedProduct.name + ' is available.');
+                }
+                signupSubmit.textContent = 'Alert Set!';
+
+            } catch (e) {
+                showSignupMsg('error', 'Network error. Please try again.');
+                signupSubmit.disabled = false;
+                signupSubmit.textContent = 'Set Free Alert';
             }
-
-            submitAlert.textContent = 'Alert Set!';
-        } catch (e) {
-            showMessage('error', 'Network error. Please try again.');
-            submitAlert.disabled = false;
-            submitAlert.textContent = 'Watch For Drop';
         }
     });
+
+    function showSignupMsg(type, msg) {
+        signupMessage.className = 'form-message ' + type;
+        signupMessage.textContent = msg;
+        signupMessage.style.display = 'block';
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────
 
     var searchTimeout;
     searchInput.addEventListener('input', function() {
@@ -1249,11 +1899,7 @@
         }, 200);
     });
 
-    function showMessage(type, msg) {
-        formMessage.className = 'form-message ' + type;
-        formMessage.textContent = msg;
-        formMessage.style.display = 'block';
-    }
+    // ── Utilities ─────────────────────────────────────────────────────────
 
     function isValidEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

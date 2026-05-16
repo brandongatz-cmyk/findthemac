@@ -46,6 +46,18 @@ CHECK_INTERVAL_ULTRA_SECONDS=15
 # TWILIO_ACCOUNT_SID=your-sid
 # TWILIO_AUTH_TOKEN=your-token
 # TWILIO_FROM_NUMBER=+1234567890
+
+# Stripe (get these from dashboard.stripe.com)
+# STRIPE_SECRET_KEY=sk_live_xxx
+# STRIPE_PUBLISHABLE_KEY=pk_live_xxx
+# STRIPE_PRICE_PRO=price_xxx
+# STRIPE_PRICE_ULTRA=price_xxx
+
+# Firebase Auth (get from console.firebase.google.com)
+# FIREBASE_API_KEY=AIzaSy...
+# FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+# FIREBASE_PROJECT_ID=your-project
+# FIREBASE_CREDENTIALS_JSON={"type":"service_account",...}
 ENVFILE
 
 echo "=== Step 7: Create systemd Service ==="

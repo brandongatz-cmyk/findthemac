@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 
 import requests
+import stripe
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, render_template, request
 
@@ -41,6 +42,26 @@ DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "fin
 CHECK_INTERVAL_FREE = int(os.getenv("CHECK_INTERVAL_FREE_MINUTES", "15"))
 CHECK_INTERVAL_PRO = int(os.getenv("CHECK_INTERVAL_PRO_SECONDS", "90"))
 CHECK_INTERVAL_ULTRA = int(os.getenv("CHECK_INTERVAL_ULTRA_SECONDS", "15"))
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_PRICE_PRO = os.getenv("STRIPE_PRICE_PRO", "")
+STRIPE_PRICE_ULTRA = os.getenv("STRIPE_PRICE_ULTRA", "")
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials as fb_credentials, auth as firebase_auth
+    _fb_creds_json = os.getenv("FIREBASE_CREDENTIALS_JSON", "")
+    if _fb_creds_json:
+        firebase_admin.initialize_app(
+            fb_credentials.Certificate(json.loads(_fb_creds_json))
+        )
+        FIREBASE_AVAILABLE = True
+    else:
+        FIREBASE_AVAILABLE = False
+except ImportError:
+    FIREBASE_AVAILABLE = False
+    logger.info("firebase-admin not installed — auth features disabled")
 
 # ============================================================================
 # Apple product catalog
@@ -127,6 +148,19 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_new_category ON new_products(category);
             CREATE INDEX IF NOT EXISTS idx_new_buyable ON new_products(buyable);
 
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                firebase_uid TEXT UNIQUE NOT NULL,
+                email TEXT,
+                display_name TEXT,
+                phone TEXT,
+                provider TEXT,
+                stripe_customer_id TEXT,
+                created_at TEXT NOT NULL,
+                last_login TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_users_firebase ON users(firebase_uid);
+
             CREATE TABLE IF NOT EXISTS retailer_cache (
                 cache_key TEXT PRIMARY KEY,
                 retailer TEXT NOT NULL,
@@ -140,6 +174,11 @@ def init_db():
         for col, default in [("check_new", "1"), ("check_refurbished", "1")]:
             try:
                 conn.execute(f"ALTER TABLE alerts ADD COLUMN {col} INTEGER DEFAULT {default}")
+            except sqlite3.OperationalError:
+                pass
+        for col in ["stripe_customer_id", "stripe_subscription_id", "user_id"]:
+            try:
+                conn.execute(f"ALTER TABLE alerts ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:
                 pass
         conn.commit()
@@ -1159,6 +1198,7 @@ def api_create_alert():
     if email and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return jsonify({"error": "Invalid email address"}), 400
 
+    user_id = data.get("user_id", "")
     now = datetime.now(timezone.utc).isoformat()
     db = get_db()
 
@@ -1180,9 +1220,9 @@ def api_create_alert():
 
     if refurb_matches or new_matches or has_retailer_hits:
         db.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, notified_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, now, now))
+            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, user_id, created_at, notified_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, user_id, now, now))
         db.commit()
 
         def _notify():
@@ -1211,9 +1251,9 @@ def api_create_alert():
         })
     else:
         db.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, created_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, now))
+            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, user_id, created_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, user_id, now))
         db.commit()
 
         return jsonify({
@@ -1228,6 +1268,227 @@ def api_check_alerts():
     active = db.execute("SELECT COUNT(*) as cnt FROM alerts WHERE active = 1").fetchone()["cnt"]
     total = db.execute("SELECT COUNT(*) as cnt FROM alerts").fetchone()["cnt"]
     return jsonify({"active_alerts": active, "total_alerts": total})
+
+
+# ============================================================================
+# Authentication
+# ============================================================================
+
+def verify_firebase_token(id_token):
+    if not FIREBASE_AVAILABLE:
+        return None
+    try:
+        return firebase_auth.verify_id_token(id_token)
+    except Exception:
+        return None
+
+
+def get_or_create_user(firebase_uid, email, display_name, provider):
+    now = datetime.now(timezone.utc).isoformat()
+    with get_db_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE firebase_uid = ?", (firebase_uid,)
+        ).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE users SET last_login = ?, email = ? WHERE firebase_uid = ?",
+                (now, email, firebase_uid),
+            )
+            conn.commit()
+            return dict(row)
+        conn.execute("""
+            INSERT INTO users (firebase_uid, email, display_name, provider, created_at, last_login)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (firebase_uid, email, display_name, provider, now, now))
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM users WHERE firebase_uid = ?", (firebase_uid,)
+        ).fetchone()
+        return dict(row)
+
+
+@app.route("/api/config")
+def api_config():
+    firebase_config = {}
+    api_key = os.getenv("FIREBASE_API_KEY", "")
+    if api_key:
+        firebase_config = {
+            "apiKey": api_key,
+            "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", ""),
+            "projectId": os.getenv("FIREBASE_PROJECT_ID", ""),
+        }
+    return jsonify({
+        "stripe_publishable_key": STRIPE_PUBLISHABLE_KEY,
+        "firebase": firebase_config,
+        "has_stripe": bool(stripe.api_key and STRIPE_PRICE_PRO and STRIPE_PRICE_ULTRA),
+        "has_firebase": bool(api_key),
+    })
+
+
+@app.route("/api/auth/session", methods=["POST"])
+def api_auth_session():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+
+    id_token = data.get("id_token", "")
+    if not id_token:
+        return jsonify({"error": "Missing ID token"}), 400
+
+    claims = verify_firebase_token(id_token)
+    if not claims:
+        return jsonify({"error": "Invalid or expired token"}), 401
+
+    uid = claims.get("uid", "")
+    email = claims.get("email", "")
+    name = claims.get("name", "")
+    provider = claims.get("firebase", {}).get("sign_in_provider", "unknown")
+
+    user = get_or_create_user(uid, email, name, provider)
+    return jsonify({
+        "user_id": user["id"],
+        "email": user["email"],
+        "display_name": user["display_name"],
+        "phone": user.get("phone", ""),
+        "has_stripe": bool(user.get("stripe_customer_id")),
+    })
+
+
+# ============================================================================
+# Stripe Subscriptions
+# ============================================================================
+
+@app.route("/api/create-subscription", methods=["POST"])
+def api_create_subscription():
+    if not stripe.api_key:
+        return jsonify({"error": "Payment processing is not configured."}), 503
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+
+    payment_method_id = data.get("payment_method_id", "").strip()
+    email = data.get("email", "").strip()
+    phone = data.get("phone", "").strip()
+    product_id = data.get("product_id", "").strip()
+    tier = data.get("tier", "").strip().lower()
+    notify_email = bool(data.get("notify_email", True))
+    notify_sms = bool(data.get("notify_sms", False))
+    user_id = data.get("user_id", "")
+
+    if tier not in ("pro", "ultra"):
+        return jsonify({"error": "Invalid tier for subscription."}), 400
+    if not payment_method_id:
+        return jsonify({"error": "Payment method required."}), 400
+    if not email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        return jsonify({"error": "Valid email address required."}), 400
+    if notify_sms and not phone:
+        return jsonify({"error": "Phone number required for SMS alerts."}), 400
+
+    product = get_product_by_id(product_id)
+    if not product:
+        return jsonify({"error": "Invalid product."}), 400
+
+    price_id = STRIPE_PRICE_PRO if tier == "pro" else STRIPE_PRICE_ULTRA
+    if not price_id:
+        return jsonify({"error": "Subscription pricing not configured."}), 503
+
+    try:
+        customer = stripe.Customer.create(
+            email=email,
+            payment_method=payment_method_id,
+            invoice_settings={"default_payment_method": payment_method_id},
+            metadata={"phone": phone, "product_id": product_id, "tier": tier},
+        )
+
+        subscription = stripe.Subscription.create(
+            customer=customer.id,
+            items=[{"price": price_id}],
+            payment_behavior="default_incomplete",
+            payment_settings={"save_default_payment_method": "on_subscription"},
+            expand=["latest_invoice.payment_intent"],
+        )
+
+        if subscription.status == "active":
+            _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
+                               tier, customer.id, subscription.id, user_id)
+            return jsonify({
+                "status": "active",
+                "message": f"Subscribed to {tier.title()} plan! Alert set for {product['name']}.",
+                "subscription_id": subscription.id,
+            })
+
+        pi = subscription.latest_invoice.payment_intent
+        if pi and pi.status == "requires_action":
+            return jsonify({
+                "status": "requires_action",
+                "client_secret": pi.client_secret,
+                "subscription_id": subscription.id,
+                "customer_id": customer.id,
+            })
+
+        if pi and pi.status == "succeeded":
+            _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
+                               tier, customer.id, subscription.id, user_id)
+            return jsonify({
+                "status": "active",
+                "message": f"Subscribed to {tier.title()} plan! Alert set for {product['name']}.",
+                "subscription_id": subscription.id,
+            })
+
+        return jsonify({"error": f"Unexpected status: {subscription.status}"}), 400
+
+    except Exception as e:
+        if hasattr(e, "user_message"):
+            return jsonify({"error": e.user_message}), 400
+        logger.error("Subscription creation failed: %s", e)
+        return jsonify({"error": "Payment processing failed. Please try again."}), 500
+
+
+@app.route("/api/confirm-subscription", methods=["POST"])
+def api_confirm_subscription():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+
+    subscription_id = data.get("subscription_id", "")
+    customer_id = data.get("customer_id", "")
+    product_id = data.get("product_id", "").strip()
+    email = data.get("email", "").strip()
+    phone = data.get("phone", "").strip()
+    tier = data.get("tier", "").strip()
+    notify_email = bool(data.get("notify_email", True))
+    notify_sms = bool(data.get("notify_sms", False))
+    user_id = data.get("user_id", "")
+
+    try:
+        sub = stripe.Subscription.retrieve(subscription_id)
+        if sub.status == "active":
+            _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
+                               tier, customer_id, subscription_id, user_id)
+            product = get_product_by_id(product_id)
+            name = product["name"] if product else "your product"
+            return jsonify({
+                "status": "active",
+                "message": f"Subscribed to {tier.title()} plan! Alert set for {name}.",
+            })
+        return jsonify({"error": "Payment was not completed."}), 400
+    except Exception as e:
+        logger.error("Subscription confirmation failed: %s", e)
+        return jsonify({"error": "Could not confirm subscription."}), 500
+
+
+def _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
+                       tier, customer_id, subscription_id, user_id=None):
+    now = datetime.now(timezone.utc).isoformat()
+    with get_db_connection() as conn:
+        conn.execute("""
+            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier,
+                              stripe_customer_id, stripe_subscription_id, user_id, created_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier,
+              customer_id, subscription_id, user_id, now))
+        conn.commit()
 
 
 # ============================================================================
