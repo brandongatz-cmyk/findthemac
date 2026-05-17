@@ -416,7 +416,7 @@ def update_new_products_cache():
 # Third-Party Retailer Search (Best Buy, B&H Photo, Swappa)
 # ============================================================================
 
-RETAILER_CACHE_TTL = 300  # 5 minutes
+RETAILER_CACHE_TTL = 600  # 10 minutes
 
 
 def build_search_query(product, memory=None):
@@ -936,8 +936,30 @@ def update_refurbished_cache():
     return refurbished
 
 
+def get_cached_retailers_for_product(product_id):
+    """Read retailer results from DB cache only — no live HTTP calls."""
+    results = {}
+    try:
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                "SELECT retailer, data, fetched_at FROM retailer_cache WHERE product_id = ?",
+                (product_id,),
+            ).fetchall()
+            for row in rows:
+                age = (datetime.now(timezone.utc) - datetime.fromisoformat(row["fetched_at"])).total_seconds()
+                if age < RETAILER_CACHE_TTL:
+                    results[row["retailer"]] = json.loads(row["data"])
+    except Exception:
+        pass
+    return results
+
+
 def process_alerts(tier, refurbished, new_products):
-    """Check active alerts for a given tier and send notifications for matches."""
+    """Check active alerts for a given tier and send notifications for matches.
+
+    Only reads from DB caches — never makes live HTTP requests.
+    Retailer data comes from the background retailer scrape cycle.
+    """
     now = datetime.now(timezone.utc).isoformat()
 
     with get_db_connection() as conn:
@@ -958,7 +980,7 @@ def process_alerts(tier, refurbished, new_products):
             refurb_matches = match_product_to_refurbished(product, refurbished) if refurbished else []
             new_matches = match_product_to_new(product, new_products) if new_products else []
 
-            retailer_results = search_all_retailers(product)
+            retailer_results = get_cached_retailers_for_product(product["id"])
             has_retailer_hits = any(
                 rdata.get("listings") for rdata in retailer_results.values()
             )
@@ -991,8 +1013,46 @@ def process_alerts(tier, refurbished, new_products):
         conn.commit()
 
 
+def update_retailer_cache_for_alerts():
+    """Scrape third-party retailers only for products that have active alerts.
+
+    Deduplicates by product_id so each product is scraped at most once,
+    regardless of how many alerts watch it.
+    """
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT product_id FROM alerts WHERE active = 1"
+        ).fetchall()
+
+    product_ids = [r["product_id"] for r in rows]
+    if not product_ids:
+        return
+
+    logger.info("Retailer scrape: %d unique products with active alerts", len(product_ids))
+
+    for pid in product_ids:
+        product = get_product_by_id(pid)
+        if not product:
+            continue
+        # search_all_retailers uses the 10-min cache internally,
+        # so products already cached will be skipped automatically
+        search_all_retailers(product)
+        time.sleep(2)
+
+
 def background_monitor():
-    """Background thread: premium every 15s, standard every 90s, free every 15 min."""
+    """Background thread that decouples scraping from alert checking.
+
+    Scraping schedule (actual HTTP requests to external sites):
+      - Apple refurbished:    every 2 min  (7 category pages)
+      - Apple new/buyability: every 5 min  (17 buy pages + API)
+      - Third-party retailers: every 5 min (only products with active alerts)
+
+    Alert checking schedule (DB reads only — no HTTP):
+      - Ultra tier: every 15 sec
+      - Pro tier:   every 90 sec
+      - Free tier:  every 15 min
+    """
     time.sleep(10)
 
     free_interval = CHECK_INTERVAL_FREE * 60
@@ -1000,14 +1060,17 @@ def background_monitor():
     ultra_interval = CHECK_INTERVAL_ULTRA
     refurb_scrape_interval = 120
     new_scrape_interval = 300
+    retailer_scrape_interval = 300
 
     time_since_free = free_interval
     time_since_pro = pro_interval
     time_since_refurb_scrape = refurb_scrape_interval
     time_since_new_scrape = new_scrape_interval
+    time_since_retailer_scrape = retailer_scrape_interval
 
     while True:
         try:
+            # ── Scrape cycle (external HTTP) ──────────────────────────
             time_since_refurb_scrape += ultra_interval
             if time_since_refurb_scrape >= refurb_scrape_interval:
                 update_refurbished_cache()
@@ -1018,6 +1081,12 @@ def background_monitor():
                 update_new_products_cache()
                 time_since_new_scrape = 0
 
+            time_since_retailer_scrape += ultra_interval
+            if time_since_retailer_scrape >= retailer_scrape_interval:
+                update_retailer_cache_for_alerts()
+                time_since_retailer_scrape = 0
+
+            # ── Alert cycle (DB reads only) ───────────────────────────
             with get_db_connection() as conn:
                 refurb_rows = conn.execute(
                     "SELECT * FROM refurbished_products WHERE available = 1"
