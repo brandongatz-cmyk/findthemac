@@ -19,7 +19,7 @@ ufw --force enable
 echo "=== Step 4: Clone the App ==="
 mkdir -p /var/www
 cd /var/www
-git clone -b claude/apple-product-alerts-ST7Go https://github.com/brandongatz-cmyk/Find_the_Mac.git findthemac
+git clone -b claude/apple-product-alerts-ST7Go https://github.com/brandongatz-cmyk/findthemac.git
 cd findthemac
 
 echo "=== Step 5: Python Virtual Environment ==="
