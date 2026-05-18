@@ -1,0 +1,18 @@
+services:
+  findthemac:
+    build: .
+    container_name: findthemac
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - findthemac-data:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.findthemac.rule=Host(`findthemac.com`) || Host(`www.findthemac.com`)"
+      - "traefik.http.routers.findthemac.entrypoints=websecure"
+      - "traefik.http.routers.findthemac.tls.certresolver=letsencrypt"
+      - "traefik.http.services.findthemac.loadbalancer.server.port=5000"
+
+volumes:
+  findthemac-data:
