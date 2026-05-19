@@ -2440,13 +2440,61 @@
                     '<div class="smr-meta" style="color:var(--terracotta);font-weight:800;">Sign up &rarr;</div>' +
                 '</div>';
             });
-        } else if (which === 'products') {
-            title = 'Products in our catalog';
-            sub = 'Click any one in the grid below to set an alert.';
-            latestStats.products_breakdown.forEach(function(p) {
-                listHtml += '<div class="stat-modal-row"><div class="smr-title">' + escapeHtml(p.name) + '</div><div class="smr-meta">' + p.count + '</div></div>';
+        } else if (which.indexOf('products:') === 0 || which === 'products') {
+            var subFilter = which.indexOf(':') !== -1 ? decodeURIComponent(which.split(':')[1]) : '';
+            var sortedProducts = allProducts.slice().sort(function(a, b) {
+                return b.year - a.year || a.name.localeCompare(b.name);
             });
-            footer = 'Total: ' + latestStats.products_total + ' products tracked · Refreshes every 15 seconds.';
+            if (subFilter) {
+                sortedProducts = sortedProducts.filter(function(p) { return p.subcategory === subFilter; });
+            }
+
+            var stockByText = {};
+            (latestStats.in_stock || []).forEach(function(item) {
+                var t = (item.title || '').toLowerCase();
+                stockByText[t] = (stockByText[t] || 0) + 1;
+            });
+            function productLiveCount(p) {
+                var pn = p.name.toLowerCase();
+                var sub = p.subcategory.toLowerCase();
+                var n = 0;
+                Object.keys(stockByText).forEach(function(t) {
+                    if (t.indexOf(sub) !== -1 && t.indexOf(String(p.year)) !== -1) n += stockByText[t];
+                    else if (t.indexOf(pn) !== -1) n += stockByText[t];
+                });
+                return n;
+            }
+
+            if (subFilter) {
+                title = subFilter;
+                sub = 'Click any product to check live availability and set an alert.';
+                listHtml += '<div class="stat-modal-row" style="background:var(--bg-deep);">' +
+                    '<button class="wizard-back-link" id="statBackToProducts" type="button" style="margin:0;">&larr; All categories</button>' +
+                    '<div class="smr-meta">' + sortedProducts.length + ' products</div>' +
+                '</div>';
+                sortedProducts.forEach(function(p) {
+                    var live = productLiveCount(p);
+                    var badge = live > 0
+                        ? '<span class="smr-meta" style="color:#22c55e;font-weight:800;">&#9679; ' + live + ' in stock</span>'
+                        : '<span class="smr-meta">— check live</span>';
+                    listHtml += '<div class="stat-modal-row smr-clickable" data-product-id="' + escapeHtml(p.id) + '">' +
+                        '<div class="smr-title">' + escapeHtml(p.name) + '<br><span class="smr-meta" style="font-weight:500;">' + p.year + '</span></div>' +
+                        '<div class="smr-meta">' + badge + '</div>' +
+                    '</div>';
+                });
+                footer = sortedProducts.length + ' products in ' + subFilter + ' · Refreshes every 15 seconds.';
+            } else {
+                title = 'Products we track';
+                sub = 'Click a category to drill into individual products. Each one opens a live availability check.';
+                listHtml += '<div class="stat-modal-row" style="background:var(--bg-deep);font-weight:700;"><div class="smr-title">Category</div><div class="smr-meta">Products</div></div>';
+                latestStats.products_breakdown.forEach(function(p) {
+                    listHtml += '<div class="stat-modal-row smr-clickable" data-product-subcat="' + escapeHtml(p.name) + '">' +
+                        '<div class="smr-title">' + escapeHtml(p.name) + '</div>' +
+                        '<div class="smr-meta">' + p.count + ' &rarr;</div>' +
+                    '</div>';
+                });
+                footer = 'Total: ' + latestStats.products_total + ' products tracked · Refreshes every 15 seconds.';
+            }
         } else if (which === 'instock') {
             title = 'In stock right now';
             sub = latestStats.in_stock_total + ' items currently available across all monitored retailers.';
@@ -2497,6 +2545,21 @@
                 closeStatModal();
                 openWizard();
                 wizSelectedTier = tier;
+            });
+        });
+        listEl.querySelectorAll('[data-product-subcat]').forEach(function(row) {
+            row.addEventListener('click', function() {
+                openStatModal('products:' + encodeURIComponent(row.dataset.productSubcat));
+            });
+        });
+        var backToProducts = document.getElementById('statBackToProducts');
+        if (backToProducts) {
+            backToProducts.addEventListener('click', function() { openStatModal('products'); });
+        }
+        listEl.querySelectorAll('[data-product-id]').forEach(function(row) {
+            row.addEventListener('click', function() {
+                closeStatModal();
+                openModal(row.dataset.productId);
             });
         });
     }
