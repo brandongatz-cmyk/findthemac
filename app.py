@@ -1040,6 +1040,35 @@ def update_retailer_cache_for_alerts():
         time.sleep(2)
 
 
+_baseline_cursor = 0
+
+def update_retailer_cache_baseline(batch_size=4):
+    """Keep the third-party retailer cache warm by rotating through the catalog.
+
+    Each tick, scrape `batch_size` products that haven't been cached recently,
+    so the "In stock" dashboard always has real data from Best Buy / B&H / Swappa
+    even when no alerts are active.
+    """
+    global _baseline_cursor
+    if not PRODUCTS:
+        return
+    end = _baseline_cursor + batch_size
+    batch = PRODUCTS[_baseline_cursor:end]
+    if end >= len(PRODUCTS):
+        batch += PRODUCTS[:end - len(PRODUCTS)]
+        _baseline_cursor = end - len(PRODUCTS)
+    else:
+        _baseline_cursor = end
+    logger.info("Retailer baseline scrape: %d products (cursor %d/%d)",
+                len(batch), _baseline_cursor, len(PRODUCTS))
+    for product in batch:
+        try:
+            search_all_retailers(product)
+        except Exception as e:
+            logger.warning("Baseline scrape failed for %s: %s", product.get("id"), e)
+        time.sleep(2)
+
+
 def background_monitor():
     """Background thread that decouples scraping from alert checking.
 
@@ -1047,6 +1076,8 @@ def background_monitor():
       - Apple refurbished:    every 2 min  (7 category pages)
       - Apple new/buyability: every 5 min  (17 buy pages + API)
       - Third-party retailers: every 5 min (only products with active alerts)
+      - Baseline retailer rotation: every 3 min (4 catalog products per tick,
+        rotating through the full catalog to keep the dashboard populated)
 
     Alert checking schedule (DB reads only — no HTTP):
       - Ultra tier: every 15 sec
@@ -1061,12 +1092,14 @@ def background_monitor():
     refurb_scrape_interval = 120
     new_scrape_interval = 300
     retailer_scrape_interval = 300
+    baseline_scrape_interval = 180
 
     time_since_free = free_interval
     time_since_pro = pro_interval
     time_since_refurb_scrape = refurb_scrape_interval
     time_since_new_scrape = new_scrape_interval
     time_since_retailer_scrape = retailer_scrape_interval
+    time_since_baseline_scrape = baseline_scrape_interval
 
     while True:
         try:
@@ -1085,6 +1118,11 @@ def background_monitor():
             if time_since_retailer_scrape >= retailer_scrape_interval:
                 update_retailer_cache_for_alerts()
                 time_since_retailer_scrape = 0
+
+            time_since_baseline_scrape += ultra_interval
+            if time_since_baseline_scrape >= baseline_scrape_interval:
+                update_retailer_cache_baseline()
+                time_since_baseline_scrape = 0
 
             # ── Alert cycle (DB reads only) ───────────────────────────
             with get_db_connection() as conn:
