@@ -2409,15 +2409,24 @@
         } else if (which === 'instock') {
             title = 'In stock right now';
             sub = latestStats.in_stock_total + ' items currently available across all monitored retailers.';
+            var byRet = latestStats.in_stock_by_retailer || {};
+            var breakdownKeys = Object.keys(byRet);
+            if (breakdownKeys.length > 0) {
+                listHtml += '<div class="stat-modal-row" style="background:var(--bg-deep);font-weight:700;"><div class="smr-title">Source</div><div class="smr-meta">Items</div></div>';
+                breakdownKeys.forEach(function(k) {
+                    listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + escapeHtml(k) + '</span></div><div class="smr-meta">' + (byRet[k] || 0) + '</div></div>';
+                });
+            }
             if (latestStats.in_stock.length === 0) {
-                listHtml = '<div class="stat-modal-row"><div class="smr-title" style="text-align:center;width:100%;">Nothing in stock right now — set an alert and we will notify you.</div></div>';
+                listHtml += '<div class="stat-modal-row"><div class="smr-title" style="text-align:center;width:100%;">No item details cached yet — check back shortly.</div></div>';
             } else {
+                listHtml += '<div class="stat-modal-row" style="background:var(--bg-deep);font-weight:700;"><div class="smr-title">Recent listings</div><div class="smr-meta">Price</div></div>';
                 latestStats.in_stock.slice(0, 100).forEach(function(item) {
                     var meta = item.price ? '$' + item.price : 'See price';
                     listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + escapeHtml(item.retailer) + '</span><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div><div class="smr-meta">' + escapeHtml(meta) + '</div></div>';
                 });
                 if (latestStats.in_stock.length > 100) {
-                    footer = 'Showing first 100 of ' + latestStats.in_stock.length + ' · Refreshes every 15 seconds.';
+                    footer = 'Showing first 100 listings · Total ' + latestStats.in_stock_total + ' · Refreshes every 15 seconds.';
                 }
             }
         }

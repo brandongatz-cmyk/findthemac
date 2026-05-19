@@ -1378,7 +1378,7 @@ def api_inventory_summary():
         "bestbuy_total": bestbuy_count,
         "bh_total": bh_count,
         "swappa_total": swappa_count,
-        "combined_total": new_total + refurb_total,
+        "combined_total": new_total + refurb_total + bestbuy_count + bh_count + swappa_count,
     })
 
 
@@ -1418,6 +1418,13 @@ def api_stats():
         key=lambda x: -x["count"]
     )
 
+    new_total_count = db.execute(
+        "SELECT COUNT(DISTINCT url) as c FROM new_products WHERE buyable = 1"
+    ).fetchone()["c"]
+    refurb_total_count = db.execute(
+        "SELECT COUNT(*) as c FROM refurbished_products WHERE available = 1"
+    ).fetchone()["c"]
+
     new_rows = db.execute(
         "SELECT url, title FROM new_products WHERE buyable = 1 LIMIT 200"
     ).fetchall()
@@ -1430,6 +1437,30 @@ def api_stats():
                   "price": r["price"], "category": r["category"]}
                  for r in refurb_rows]
 
+    retailer_totals = {"Best Buy": 0, "B&H Photo": 0, "Swappa": 0}
+    try:
+        retailer_rows = db.execute("SELECT retailer, data FROM retailer_cache").fetchall()
+        retailer_label = {"bestbuy": "Best Buy", "bh": "B&H Photo", "swappa": "Swappa"}
+        for row in retailer_rows:
+            label = retailer_label.get(row["retailer"], row["retailer"])
+            try:
+                data = json.loads(row["data"])
+                listings = data.get("listings", [])
+                retailer_totals[label] = retailer_totals.get(label, 0) + len(listings)
+                for item in listings[:50]:
+                    in_stock.append({
+                        "retailer": label,
+                        "title": item.get("title", "Listing"),
+                        "url": item.get("url", ""),
+                        "price": item.get("price"),
+                    })
+            except (json.JSONDecodeError, TypeError):
+                continue
+    except Exception:
+        pass
+
+    grand_total = new_total_count + refurb_total_count + sum(retailer_totals.values())
+
     return jsonify({
         "retailers": retailers,
         "retailer_count": len(retailers),
@@ -1439,7 +1470,12 @@ def api_stats():
         "products_total": len(PRODUCTS),
         "products_breakdown": products_breakdown,
         "in_stock": in_stock,
-        "in_stock_total": len(in_stock),
+        "in_stock_total": grand_total,
+        "in_stock_by_retailer": {
+            "Apple.com": new_total_count,
+            "Apple Refurbished": refurb_total_count,
+            **retailer_totals,
+        },
     })
 
 
