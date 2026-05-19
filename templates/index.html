@@ -587,6 +587,247 @@
             box-shadow: 6px 6px 0 var(--terracotta);
         }
 
+        .wizard-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10,10,10,0.7);
+            z-index: 300;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 24px;
+            overflow-y: auto;
+        }
+        .wizard-overlay.visible { display: flex; }
+        .wizard-panel {
+            background: var(--paper);
+            border: 2px solid var(--ink);
+            border-radius: 14px;
+            max-width: 700px;
+            width: 100%;
+            margin: 40px auto;
+            box-shadow: 10px 10px 0 var(--ink);
+            animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+        .wizard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
+            border-bottom: 2px solid var(--ink);
+        }
+        .wizard-header h2 {
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .wizard-body { padding: 20px 24px 24px; }
+        .wizard-step { display: none; }
+        .wizard-step.active { display: block; }
+        .wizard-search-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid var(--ink);
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            outline: none;
+            font-weight: 500;
+            box-shadow: 3px 3px 0 var(--ink);
+            margin-bottom: 16px;
+            box-sizing: border-box;
+        }
+        .wizard-search-input:focus { box-shadow: 4px 4px 0 var(--terracotta); }
+        .wizard-search-input::placeholder { color: var(--ink-muted); }
+        .wizard-filters-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            border: 2px solid var(--ink);
+            border-radius: 100px;
+            background: var(--paper);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink);
+            margin-bottom: 12px;
+            transition: all 0.15s;
+        }
+        .wizard-filters-toggle:hover, .wizard-filters-toggle.active {
+            background: var(--ink);
+            color: var(--bg);
+        }
+        .wizard-filter-panel { display: none; margin-bottom: 16px; }
+        .wizard-filter-panel.open { display: block; }
+        .wizard-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        .wizard-product-card {
+            background: var(--paper);
+            border: 2px solid var(--ink);
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+        .wizard-product-card:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 var(--terracotta);
+        }
+        .wizard-product-card.selected {
+            background: var(--ink);
+            color: var(--bg);
+            box-shadow: 4px 4px 0 var(--terracotta);
+        }
+        .wizard-product-card img {
+            max-width: 100%;
+            max-height: 80px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+        .wizard-product-card .wpc-name {
+            font-family: 'Fraunces', serif;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .wizard-product-card .wpc-meta {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 3px;
+        }
+        .wizard-product-card.selected .wpc-meta { opacity: 0.8; }
+        .wizard-no-results {
+            text-align: center;
+            padding: 30px;
+            color: var(--ink-muted);
+            font-size: 14px;
+            grid-column: 1 / -1;
+        }
+        .wizard-selection-summary {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            border: 2px solid var(--ink);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            background: var(--bg-deep);
+        }
+        .wizard-selection-summary img {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+        }
+        .wizard-selection-summary .wss-name {
+            font-family: 'Fraunces', serif;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .wizard-selection-summary .wss-meta {
+            font-size: 12px;
+            color: var(--ink-muted);
+        }
+        .wizard-tier-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .wizard-tier {
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            padding: 18px 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: var(--paper);
+        }
+        .wizard-tier:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+        .wizard-tier.selected {
+            background: var(--ink);
+            color: var(--bg);
+            box-shadow: 4px 4px 0 var(--terracotta);
+        }
+        .wizard-tier.selected.paid {
+            background: var(--terracotta);
+            color: var(--paper);
+        }
+        .wizard-tier .wt-name {
+            font-family: 'Fraunces', serif;
+            font-size: 17px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .wizard-tier .wt-detail {
+            font-size: 11px;
+            opacity: 0.7;
+            line-height: 1.5;
+        }
+        .wizard-tier .wt-price {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 14px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 800;
+            background: rgba(0,0,0,0.1);
+        }
+        .wizard-tier.selected .wt-price { background: rgba(255,255,255,0.2); }
+        .wizard-cta-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 16px 24px;
+            border: 2px solid var(--ink);
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            background: var(--ink);
+            color: var(--bg);
+            transition: all 0.15s;
+        }
+        .wizard-cta-btn:hover { background: var(--terracotta); border-color: var(--terracotta); }
+        .wizard-cta-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .wizard-back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink-muted);
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-family: 'Inter', sans-serif;
+            padding: 0;
+        }
+        .wizard-back-link:hover { color: var(--ink); }
+        @media (max-width: 600px) {
+            .wizard-tier-grid { grid-template-columns: 1fr; }
+            .wizard-results { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+        }
+
         .no-results {
             grid-column: 1 / -1;
             text-align: center;
@@ -1299,7 +1540,7 @@
     <span class="eyebrow">Apple inventory radar</span>
     <h1>Stop refreshing. <br><span class="italic">We'll text you</span> when it's <span class="highlight">in stock.</span></h1>
     <p class="hero-sub">Set a watch on any Apple product. The moment it shows up <strong>new, refurbished, or used</strong> across Apple, Best Buy, B&amp;H, or Swappa — you'll know in <strong>15 seconds</strong>.</p>
-    <a class="hero-cta" href="#productGrid" onclick="document.getElementById('searchInput').focus();return false;">
+    <a class="hero-cta" href="#" id="heroCta" onclick="return false;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         Set Your First Alert — It's Free
     </a>
@@ -1687,6 +1928,158 @@
                 <div class="signup-footer" id="signupFooter" style="display:none;">
                     Payments processed securely by Stripe. Cancel anytime.
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="wizard-overlay" id="wizardOverlay">
+    <div class="wizard-panel">
+        <div class="wizard-header">
+            <h2 id="wizardTitle">Set an <span style="font-style:italic;color:var(--terracotta);">alert</span></h2>
+            <button class="modal-close" id="wizardClose">&times;</button>
+        </div>
+        <div class="wizard-body">
+            <div class="wizard-step active" id="wizardStep1">
+                <p style="margin:0 0 16px;font-size:15px;color:var(--ink-soft);">Describe what you're looking for, or use filters to narrow down.</p>
+                <input type="text" class="wizard-search-input" id="wizardSearch" placeholder="e.g. MacBook Pro 16 inch M4 Max 128GB, or just &quot;Mac mini&quot;">
+                <button class="wizard-filters-toggle" id="wizardFiltersBtn" type="button">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+                    Filters
+                    <span class="filter-count" id="wizardFilterCount" hidden>0</span>
+                </button>
+                <div class="wizard-filter-panel" id="wizardFilterPanel">
+                    <div class="filter-section">
+                        <h4>DIMM Capacity</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value="1GB">1 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="2GB">2 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="4GB">4 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="8GB">8 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="16GB">16 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="32GB">32 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="64GB">64 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="128GB">128 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="192GB">192 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="256GB">256 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="384GB">384 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="512GB">512 GB</button>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <h4>Model</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value="MacBook Air">MacBook Air</button>
+                            <button class="filter-chip wiz-chip" data-value="MacBook Pro">MacBook Pro</button>
+                            <button class="filter-chip wiz-chip" data-value="iMac">iMac</button>
+                            <button class="filter-chip wiz-chip" data-value="Mac mini">Mac mini</button>
+                            <button class="filter-chip wiz-chip" data-value="Mac Studio">Mac Studio</button>
+                            <button class="filter-chip wiz-chip" data-value="Mac Pro">Mac Pro</button>
+                            <button class="filter-chip wiz-chip" data-value="iPad">iPad</button>
+                            <button class="filter-chip wiz-chip" data-value="iPhone">iPhone</button>
+                            <button class="filter-chip wiz-chip" data-value="Apple Watch">Apple Watch</button>
+                            <button class="filter-chip wiz-chip" data-value="AirPods">AirPods</button>
+                            <button class="filter-chip wiz-chip" data-value="Apple TV">Apple TV</button>
+                            <button class="filter-chip wiz-chip" data-value="HomePod">HomePod</button>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <h4>Chip</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value="M1">M1</button>
+                            <button class="filter-chip wiz-chip" data-value="M1 Pro">M1 Pro</button>
+                            <button class="filter-chip wiz-chip" data-value="M1 Max">M1 Max</button>
+                            <button class="filter-chip wiz-chip" data-value="M1 Ultra">M1 Ultra</button>
+                            <button class="filter-chip wiz-chip" data-value="M2">M2</button>
+                            <button class="filter-chip wiz-chip" data-value="M2 Pro">M2 Pro</button>
+                            <button class="filter-chip wiz-chip" data-value="M2 Max">M2 Max</button>
+                            <button class="filter-chip wiz-chip" data-value="M2 Ultra">M2 Ultra</button>
+                            <button class="filter-chip wiz-chip" data-value="M3">M3</button>
+                            <button class="filter-chip wiz-chip" data-value="M3 Pro">M3 Pro</button>
+                            <button class="filter-chip wiz-chip" data-value="M3 Max">M3 Max</button>
+                            <button class="filter-chip wiz-chip" data-value="M3 Ultra">M3 Ultra</button>
+                            <button class="filter-chip wiz-chip" data-value="M4">M4</button>
+                            <button class="filter-chip wiz-chip" data-value="M4 Pro">M4 Pro</button>
+                            <button class="filter-chip wiz-chip" data-value="M4 Max">M4 Max</button>
+                            <button class="filter-chip wiz-chip" data-value="Intel i5">Intel i5</button>
+                            <button class="filter-chip wiz-chip" data-value="Intel i7">Intel i7</button>
+                            <button class="filter-chip wiz-chip" data-value="Intel i9">Intel i9</button>
+                            <button class="filter-chip wiz-chip" data-value="Xeon">Xeon</button>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <h4>Storage</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value="64GB SSD">64 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="128GB SSD">128 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="256GB">256 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="512GB">512 GB</button>
+                            <button class="filter-chip wiz-chip" data-value="1TB">1 TB</button>
+                            <button class="filter-chip wiz-chip" data-value="2TB">2 TB</button>
+                            <button class="filter-chip wiz-chip" data-value="4TB">4 TB</button>
+                            <button class="filter-chip wiz-chip" data-value="8TB">8 TB</button>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <h4>Screen Size</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value='13"'>13"</button>
+                            <button class="filter-chip wiz-chip" data-value='14"'>14"</button>
+                            <button class="filter-chip wiz-chip" data-value='15"'>15"</button>
+                            <button class="filter-chip wiz-chip" data-value='16"'>16"</button>
+                            <button class="filter-chip wiz-chip" data-value='24"'>24"</button>
+                            <button class="filter-chip wiz-chip" data-value='27"'>27"</button>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <h4>Year</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value="2026">2026</button>
+                            <button class="filter-chip wiz-chip" data-value="2025">2025</button>
+                            <button class="filter-chip wiz-chip" data-value="2024">2024</button>
+                            <button class="filter-chip wiz-chip" data-value="2023">2023</button>
+                            <button class="filter-chip wiz-chip" data-value="2022">2022</button>
+                            <button class="filter-chip wiz-chip" data-value="2021">2021</button>
+                            <button class="filter-chip wiz-chip" data-value="2020">2020</button>
+                            <button class="filter-chip wiz-chip" data-value="2019">2019</button>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <h4>Color</h4>
+                        <div class="filter-options">
+                            <button class="filter-chip wiz-chip" data-value="Space Gray">Space Gray</button>
+                            <button class="filter-chip wiz-chip" data-value="Space Black">Space Black</button>
+                            <button class="filter-chip wiz-chip" data-value="Silver">Silver</button>
+                            <button class="filter-chip wiz-chip" data-value="Starlight">Starlight</button>
+                            <button class="filter-chip wiz-chip" data-value="Midnight">Midnight</button>
+                            <button class="filter-chip wiz-chip" data-value="Gold">Gold</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="wizard-results" id="wizardResults"></div>
+            </div>
+            <div class="wizard-step" id="wizardStep2">
+                <button class="wizard-back-link" id="wizardBackBtn" type="button">&larr; Change product</button>
+                <div class="wizard-selection-summary" id="wizardSummary"></div>
+                <h3 style="font-family:'Fraunces',serif;font-size:18px;font-weight:800;margin:0 0 16px;letter-spacing:-0.3px;">Choose your <span style="font-style:italic;color:var(--terracotta);">plan</span></h3>
+                <div class="wizard-tier-grid" id="wizardTierGrid">
+                    <div class="wizard-tier" data-tier="free">
+                        <div class="wt-name">Free</div>
+                        <div class="wt-detail">Every 15 min<br>Email only</div>
+                        <span class="wt-price">$0</span>
+                    </div>
+                    <div class="wizard-tier paid" data-tier="pro">
+                        <div class="wt-name">Pro</div>
+                        <div class="wt-detail">Every 90 sec<br>Email + SMS</div>
+                        <span class="wt-price">$7/mo</span>
+                    </div>
+                    <div class="wizard-tier paid" data-tier="ultra">
+                        <div class="wt-name">Ultra</div>
+                        <div class="wt-detail">Every 15 sec<br>Email + SMS</div>
+                        <span class="wt-price">$14/mo</span>
+                    </div>
+                </div>
+                <button class="wizard-cta-btn" id="wizardCtaBtn" disabled>Select a plan to continue</button>
             </div>
         </div>
     </div>
@@ -2080,6 +2473,168 @@
     document.getElementById('filterApply').addEventListener('click', function() {
         filterPanel.setAttribute('hidden', '');
         filterToggleBtn.classList.remove('active');
+    });
+
+    // ── Alert Wizard ──────────────────────────────────────────────────────
+
+    var wizardOverlay = document.getElementById('wizardOverlay');
+    var wizardSearch = document.getElementById('wizardSearch');
+    var wizardResults = document.getElementById('wizardResults');
+    var wizardStep1 = document.getElementById('wizardStep1');
+    var wizardStep2 = document.getElementById('wizardStep2');
+    var wizardSummary = document.getElementById('wizardSummary');
+    var wizardCtaBtn = document.getElementById('wizardCtaBtn');
+    var wizardFiltersBtn = document.getElementById('wizardFiltersBtn');
+    var wizardFilterPanel = document.getElementById('wizardFilterPanel');
+    var wizardFilterCount = document.getElementById('wizardFilterCount');
+    var wizardTierGrid = document.getElementById('wizardTierGrid');
+    var wizFilters = [];
+    var wizSelectedProduct = null;
+    var wizSelectedTier = '';
+
+    document.getElementById('heroCta').addEventListener('click', function() {
+        openWizard();
+    });
+
+    function openWizard() {
+        wizFilters = [];
+        wizSelectedProduct = null;
+        wizSelectedTier = '';
+        wizardSearch.value = '';
+        wizardFilterPanel.className = 'wizard-filter-panel';
+        wizardFiltersBtn.classList.remove('active');
+        wizardFilterPanel.querySelectorAll('.wiz-chip').forEach(function(c) { c.classList.remove('active'); });
+        updateWizFilterCount();
+        wizardStep1.classList.add('active');
+        wizardStep2.classList.remove('active');
+        wizardOverlay.classList.add('visible');
+        renderWizardResults();
+        setTimeout(function() { wizardSearch.focus(); }, 100);
+    }
+
+    document.getElementById('wizardClose').addEventListener('click', function() {
+        wizardOverlay.classList.remove('visible');
+    });
+    wizardOverlay.addEventListener('click', function(e) {
+        if (e.target === wizardOverlay) wizardOverlay.classList.remove('visible');
+    });
+
+    wizardSearch.addEventListener('input', function() { renderWizardResults(); });
+
+    wizardFiltersBtn.addEventListener('click', function() {
+        var isOpen = wizardFilterPanel.classList.contains('open');
+        wizardFilterPanel.classList.toggle('open', !isOpen);
+        wizardFiltersBtn.classList.toggle('active', !isOpen);
+    });
+
+    wizardFilterPanel.querySelectorAll('.wiz-chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+            var val = chip.dataset.value;
+            if (chip.classList.contains('active')) {
+                chip.classList.remove('active');
+                wizFilters = wizFilters.filter(function(f) { return f !== val; });
+            } else {
+                chip.classList.add('active');
+                wizFilters.push(val);
+            }
+            updateWizFilterCount();
+            renderWizardResults();
+        });
+    });
+
+    function updateWizFilterCount() {
+        var n = wizFilters.length;
+        if (n > 0) {
+            wizardFilterCount.textContent = n;
+            wizardFilterCount.removeAttribute('hidden');
+        } else {
+            wizardFilterCount.setAttribute('hidden', '');
+        }
+    }
+
+    function renderWizardResults() {
+        var q = wizardSearch.value.toLowerCase().trim();
+        var tokens = q.split(/\s+/).filter(Boolean);
+
+        var results = allProducts.filter(function(p) {
+            var haystack = (p.name + ' ' + p.subcategory + ' ' + p.keywords.join(' ') + ' ' + p.year).toLowerCase();
+            var matchSearch = tokens.length === 0 || tokens.every(function(t) {
+                return haystack.indexOf(t) !== -1;
+            });
+            var matchFilters = wizFilters.every(function(f) {
+                return haystack.indexOf(f.toLowerCase()) !== -1;
+            });
+            return matchSearch && matchFilters;
+        });
+
+        results.sort(function(a, b) { return b.year - a.year || a.name.localeCompare(b.name); });
+
+        if (results.length === 0) {
+            wizardResults.innerHTML = '<div class="wizard-no-results">No products match. Try a different search or adjust filters.</div>';
+            return;
+        }
+
+        var html = '';
+        results.forEach(function(p) {
+            var catInfo = categories.find(function(c) { return c.id === p.category; }) || {};
+            html += '<div class="wizard-product-card" data-id="' + p.id + '">' +
+                '<img src="' + p.image + '" alt="' + escapeHtml(p.name) + '" onerror="this.style.display=\'none\'">' +
+                '<div class="wpc-name">' + escapeHtml(p.name) + '</div>' +
+                '<div class="wpc-meta">' + p.subcategory + ' · ' + p.year + '</div>' +
+            '</div>';
+        });
+        wizardResults.innerHTML = html;
+
+        wizardResults.querySelectorAll('.wizard-product-card').forEach(function(card) {
+            card.addEventListener('click', function() {
+                var p = allProducts.find(function(x) { return x.id === card.dataset.id; });
+                if (!p) return;
+                wizSelectedProduct = p;
+                showWizardStep2();
+            });
+        });
+    }
+
+    function showWizardStep2() {
+        var p = wizSelectedProduct;
+        wizSelectedTier = '';
+        wizardTierGrid.querySelectorAll('.wizard-tier').forEach(function(t) { t.classList.remove('selected'); });
+        wizardCtaBtn.disabled = true;
+        wizardCtaBtn.textContent = 'Select a plan to continue';
+
+        var catInfo = categories.find(function(c) { return c.id === p.category; }) || {};
+        wizardSummary.innerHTML =
+            '<img src="' + p.image + '" alt="' + escapeHtml(p.name) + '" onerror="this.style.display=\'none\'">' +
+            '<div>' +
+                '<div class="wss-name">' + escapeHtml(p.name) + '</div>' +
+                '<div class="wss-meta">' + p.subcategory + ' · ' + p.year + '</div>' +
+            '</div>';
+
+        wizardStep1.classList.remove('active');
+        wizardStep2.classList.add('active');
+    }
+
+    document.getElementById('wizardBackBtn').addEventListener('click', function() {
+        wizardStep2.classList.remove('active');
+        wizardStep1.classList.add('active');
+    });
+
+    wizardTierGrid.addEventListener('click', function(e) {
+        var tierEl = e.target.closest('.wizard-tier');
+        if (!tierEl) return;
+        wizSelectedTier = tierEl.dataset.tier;
+        wizardTierGrid.querySelectorAll('.wizard-tier').forEach(function(t) { t.classList.remove('selected'); });
+        tierEl.classList.add('selected');
+        var labels = { free: 'Set Free Alert', pro: 'Continue with Pro — $7/mo', ultra: 'Continue with Ultra — $14/mo' };
+        wizardCtaBtn.textContent = labels[wizSelectedTier] || 'Continue';
+        wizardCtaBtn.disabled = false;
+    });
+
+    wizardCtaBtn.addEventListener('click', function() {
+        if (!wizSelectedProduct || !wizSelectedTier) return;
+        selectedProduct = wizSelectedProduct;
+        wizardOverlay.classList.remove('visible');
+        openSignup(wizSelectedTier);
     });
 
     // ── Tier cards → open signup overlay ───────────────────────────────────
