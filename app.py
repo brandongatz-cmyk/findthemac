@@ -55,6 +55,22 @@ STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_PRICE_PRO = os.getenv("STRIPE_PRICE_PRO", "")
 STRIPE_PRICE_ULTRA = os.getenv("STRIPE_PRICE_ULTRA", "")
 
+# Retailers we surface to customers. Hidden retailers (Best Buy, B&H, Swappa) are
+# still scraped in the background so we can monitor their reliability, but we
+# don't show them in stats, in-stock feeds, alerts, or email/SMS notifications.
+# Re-enable a retailer by adding its key here.
+VISIBLE_RETAILER_KEYS = {"apple_new", "apple_refurb"}
+THIRD_PARTY_RETAILER_KEYS = {"bestbuy", "bh", "swappa"}
+
+def is_retailer_visible(retailer_key):
+    return retailer_key in VISIBLE_RETAILER_KEYS
+
+def filter_visible_retailers(retailer_results):
+    """Strip hidden retailers from a {key: {...}} dict."""
+    if not retailer_results:
+        return {}
+    return {k: v for k, v in retailer_results.items() if is_retailer_visible(k)}
+
 try:
     import firebase_admin
     from firebase_admin import credentials as fb_credentials, auth as firebase_auth
@@ -1040,7 +1056,12 @@ def match_listing_to_criteria(title, criteria):
 
 
 def scan_inventory_by_criteria(criteria, refurbished, new_products):
-    """Scan all available inventory for items matching the criteria."""
+    """Scan all available inventory for items matching the criteria.
+
+    Only consults visible third-party retailer caches — hidden retailers
+    (Best Buy / B&H / Swappa) are still scraped for monitoring but their
+    cached listings do not trigger customer alerts.
+    """
     refurb_matches = [r for r in (refurbished or []) if match_listing_to_criteria(r.get("title", ""), criteria)]
     new_matches = [n for n in (new_products or []) if match_listing_to_criteria(n.get("title", ""), criteria)]
     retailer_results = {}
@@ -1048,6 +1069,8 @@ def scan_inventory_by_criteria(criteria, refurbished, new_products):
         with get_db_connection() as conn:
             rows = conn.execute("SELECT retailer, data, fetched_at FROM retailer_cache").fetchall()
             for row in rows:
+                if not is_retailer_visible(row["retailer"]):
+                    continue
                 age = (datetime.now(timezone.utc) - datetime.fromisoformat(row["fetched_at"])).total_seconds()
                 if age >= RETAILER_CACHE_TTL:
                     continue
@@ -1106,6 +1129,8 @@ def process_alerts(tier, refurbished, new_products):
                 retailer_results = get_cached_retailers_for_product(product["id"])
                 product_name = product["name"]
                 product_id_for_log = product["id"]
+
+            retailer_results = filter_visible_retailers(retailer_results)
 
             has_retailer_hits = any(
                 rdata.get("listings") for rdata in retailer_results.values()
@@ -1356,8 +1381,8 @@ def llms_txt():
 
 > Apple product availability tracker and in-stock alert service.
 
-FindTheMac monitors {product_count} Apple products across 5 retailers in real time:
-Apple.com (new), Apple Certified Refurbished, Best Buy, B&H Photo, and Swappa.
+FindTheMac monitors {product_count} Apple products in real time on
+Apple.com (new) and Apple Certified Refurbished.
 
 ## What it does
 
@@ -1383,9 +1408,6 @@ purchase links to every retailer carrying it.
 
 1. **Apple.com** — new products via buy pages and buyability API
 2. **Apple Certified Refurbished** — scrapes refurbished store for all categories
-3. **Best Buy** — product search by Apple keyword matching
-4. **B&H Photo** — structured data and product tile scraping
-5. **Swappa** — used and refurbished marketplace listings
 
 ## How alerts work
 
@@ -1417,7 +1439,7 @@ def ai_plugin():
         "name_for_human": "FindTheMac",
         "name_for_model": "findthemac",
         "description_for_human": "Track Apple product availability and get instant alerts when products come in stock.",
-        "description_for_model": "FindTheMac monitors Apple product availability across Apple.com, Apple Refurbished, Best Buy, B&H Photo, and Swappa. It tracks MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, Mac Pro, iPad, iPhone, Apple Watch, AirPods, Apple TV, and HomePod. Users can set alerts with 15-minute (free), 90-second (Pro), or 15-second (Ultra) check intervals. Alerts include direct purchase links.",
+        "description_for_model": "FindTheMac monitors Apple product availability on Apple.com (new) and Apple Certified Refurbished. It tracks MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, Mac Pro, iPad, iPhone, Apple Watch, AirPods, Apple TV, and HomePod. Users can set alerts with 15-minute (free), 90-second (Pro), or 15-second (Ultra) check intervals. Alerts include direct purchase links.",
         "auth": {"type": "none"},
         "api": {"type": "openapi", "url": "https://findthemac.com/api/products"},
         "logo_url": "https://findthemac.com/static/logo.png",
@@ -1483,6 +1505,8 @@ def api_availability(product_id):
     }
 
     for retailer_name, data in retailer_results.items():
+        if not is_retailer_visible(retailer_name):
+            continue
         listings = data.get("listings", [])
         response[retailer_name] = {
             "available": len(listings) > 0,
@@ -1542,7 +1566,9 @@ def api_inventory_summary():
         "bestbuy_total": bestbuy_count,
         "bh_total": bh_count,
         "swappa_total": swappa_count,
-        "combined_total": new_total + refurb_total + bestbuy_count + bh_count + swappa_count,
+        # Only sum visible retailers — hidden third-party scrapers still run
+        # in the background for monitoring but don't count for customers.
+        "combined_total": new_total + refurb_total,
     })
 
 
@@ -1551,7 +1577,7 @@ def api_stats():
     """Live stats for the hero stat row plus detail data shown in click-through modals."""
     db = get_db()
 
-    retailers = [
+    all_retailers = [
         {"id": "apple_new", "name": "Apple.com", "category": "New",
          "homepage": "https://www.apple.com/shop/buy-mac",
          "interval_label": f"{CHECK_INTERVAL_FREE} min (Free) / {CHECK_INTERVAL_ULTRA}s (Ultra)"},
@@ -1568,6 +1594,7 @@ def api_stats():
          "homepage": "https://swappa.com/apple",
          "interval_label": "Cached every 5 min"},
     ]
+    retailers = [r for r in all_retailers if is_retailer_visible(r["id"])]
 
     intervals = [
         {"tier": "Free", "interval_seconds": CHECK_INTERVAL_FREE * 60,
@@ -1613,14 +1640,17 @@ def api_stats():
         retailer_rows = db.execute("SELECT retailer, data FROM retailer_cache").fetchall()
         retailer_label = {"bestbuy": "Best Buy", "bh": "B&H Photo", "swappa": "Swappa"}
         for row in retailer_rows:
-            label = retailer_label.get(row["retailer"], row["retailer"])
+            rkey = row["retailer"]
+            label = retailer_label.get(rkey, rkey)
             try:
                 data = json.loads(row["data"])
                 listings = data.get("listings", [])
-                retailer_totals[row["retailer"]] = retailer_totals.get(row["retailer"], 0) + len(listings)
+                retailer_totals[rkey] = retailer_totals.get(rkey, 0) + len(listings)
+                if not is_retailer_visible(rkey):
+                    continue
                 for item in listings[:100]:
                     in_stock.append({
-                        "retailer_id": row["retailer"],
+                        "retailer_id": rkey,
                         "retailer": label,
                         "title": item.get("title", "Listing"),
                         "url": item.get("url", ""),
@@ -1631,7 +1661,24 @@ def api_stats():
     except Exception:
         pass
 
-    grand_total = new_total_count + refurb_total_count + sum(retailer_totals.values())
+    visible_retailer_total = sum(
+        c for k, c in retailer_totals.items() if is_retailer_visible(k)
+    )
+    grand_total = new_total_count + refurb_total_count + visible_retailer_total
+
+    in_stock_by_retailer = {}
+    in_stock_by_retailer_name = {}
+    full_count_map = {
+        "apple_new": ("Apple.com", new_total_count),
+        "apple_refurb": ("Apple Certified Refurbished", refurb_total_count),
+        "bestbuy": ("Best Buy", retailer_totals.get("bestbuy", 0)),
+        "bh": ("B&H Photo", retailer_totals.get("bh", 0)),
+        "swappa": ("Swappa", retailer_totals.get("swappa", 0)),
+    }
+    for rkey, (rname, rcount) in full_count_map.items():
+        if is_retailer_visible(rkey):
+            in_stock_by_retailer[rkey] = rcount
+            in_stock_by_retailer_name[rname] = rcount
 
     return jsonify({
         "retailers": retailers,
@@ -1643,20 +1690,8 @@ def api_stats():
         "products_breakdown": products_breakdown,
         "in_stock": in_stock,
         "in_stock_total": grand_total,
-        "in_stock_by_retailer": {
-            "apple_new": new_total_count,
-            "apple_refurb": refurb_total_count,
-            "bestbuy": retailer_totals.get("bestbuy", 0),
-            "bh": retailer_totals.get("bh", 0),
-            "swappa": retailer_totals.get("swappa", 0),
-        },
-        "in_stock_by_retailer_name": {
-            "Apple.com": new_total_count,
-            "Apple Certified Refurbished": refurb_total_count,
-            "Best Buy": retailer_totals.get("bestbuy", 0),
-            "B&H Photo": retailer_totals.get("bh", 0),
-            "Swappa": retailer_totals.get("swappa", 0),
-        },
+        "in_stock_by_retailer": in_stock_by_retailer,
+        "in_stock_by_retailer_name": in_stock_by_retailer_name,
     })
 
 
@@ -1709,7 +1744,7 @@ def api_create_alert():
         ).fetchall()
         new_matches = match_product_to_new(product, [dict(r) for r in new_rows])
 
-        retailer_results = search_all_retailers(product)
+        retailer_results = filter_visible_retailers(search_all_retailers(product))
         watch_name = product["name"]
         criteria_json = None
     else:
