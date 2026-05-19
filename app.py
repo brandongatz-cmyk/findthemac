@@ -183,7 +183,7 @@ def init_db():
                 conn.execute(f"ALTER TABLE alerts ADD COLUMN {col} INTEGER DEFAULT {default}")
             except sqlite3.OperationalError:
                 pass
-        for col in ["stripe_customer_id", "stripe_subscription_id", "user_id"]:
+        for col in ["stripe_customer_id", "stripe_subscription_id", "user_id", "criteria"]:
             try:
                 conn.execute(f"ALTER TABLE alerts ADD COLUMN {col} TEXT")
             except sqlite3.OperationalError:
@@ -1016,6 +1016,55 @@ def get_cached_retailers_for_product(product_id):
     return results
 
 
+def criteria_label(criteria):
+    """Build a human-readable label from criteria filters."""
+    parts = []
+    if criteria.get("search"):
+        parts.append(criteria["search"])
+    parts.extend(criteria.get("filters", []))
+    return " + ".join(parts) if parts else "Custom search"
+
+
+def match_listing_to_criteria(title, criteria):
+    """Return True if every criteria term appears in the listing title."""
+    if not title:
+        return False
+    title_lower = title.lower()
+    search = (criteria.get("search") or "").strip().lower()
+    if search and search not in title_lower:
+        return False
+    for f in criteria.get("filters", []):
+        if f.lower() not in title_lower:
+            return False
+    return bool(search or criteria.get("filters"))
+
+
+def scan_inventory_by_criteria(criteria, refurbished, new_products):
+    """Scan all available inventory for items matching the criteria."""
+    refurb_matches = [r for r in (refurbished or []) if match_listing_to_criteria(r.get("title", ""), criteria)]
+    new_matches = [n for n in (new_products or []) if match_listing_to_criteria(n.get("title", ""), criteria)]
+    retailer_results = {}
+    try:
+        with get_db_connection() as conn:
+            rows = conn.execute("SELECT retailer, data, fetched_at FROM retailer_cache").fetchall()
+            for row in rows:
+                age = (datetime.now(timezone.utc) - datetime.fromisoformat(row["fetched_at"])).total_seconds()
+                if age >= RETAILER_CACHE_TTL:
+                    continue
+                try:
+                    data = json.loads(row["data"])
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                matching = [item for item in data.get("listings", [])
+                            if match_listing_to_criteria(item.get("title", ""), criteria)]
+                if matching:
+                    existing = retailer_results.setdefault(row["retailer"], {"search_url": data.get("search_url", ""), "listings": []})
+                    existing["listings"].extend(matching)
+    except Exception:
+        pass
+    return refurb_matches, new_matches, retailer_results
+
+
 def process_alerts(tier, refurbished, new_products):
     """Check active alerts for a given tier and send notifications for matches.
 
@@ -1035,14 +1084,29 @@ def process_alerts(tier, refurbished, new_products):
         logger.info("Processing %d active '%s' tier alert(s)", len(alerts), tier)
 
         for alert in alerts:
-            product = get_product_by_id(alert["product_id"])
-            if not product:
-                continue
+            alert_keys = alert.keys() if hasattr(alert, "keys") else []
+            criteria_str = alert["criteria"] if "criteria" in alert_keys else None
 
-            refurb_matches = match_product_to_refurbished(product, refurbished) if refurbished else []
-            new_matches = match_product_to_new(product, new_products) if new_products else []
+            if criteria_str:
+                try:
+                    criteria = json.loads(criteria_str)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                refurb_matches, new_matches, retailer_results = scan_inventory_by_criteria(
+                    criteria, refurbished, new_products
+                )
+                product_name = criteria_label(criteria)
+                product_id_for_log = "criteria"
+            else:
+                product = get_product_by_id(alert["product_id"])
+                if not product:
+                    continue
+                refurb_matches = match_product_to_refurbished(product, refurbished) if refurbished else []
+                new_matches = match_product_to_new(product, new_products) if new_products else []
+                retailer_results = get_cached_retailers_for_product(product["id"])
+                product_name = product["name"]
+                product_id_for_log = product["id"]
 
-            retailer_results = get_cached_retailers_for_product(product["id"])
             has_retailer_hits = any(
                 rdata.get("listings") for rdata in retailer_results.values()
             )
@@ -1052,18 +1116,18 @@ def process_alerts(tier, refurbished, new_products):
 
             retailer_count = sum(len(d.get("listings", [])) for d in retailer_results.values())
             logger.info(
-                "Product '%s': %d new + %d refurb + %d retailer [%s tier]",
-                product["name"], len(new_matches), len(refurb_matches), retailer_count, tier,
+                "Match '%s' (%s): %d new + %d refurb + %d retailer [%s tier]",
+                product_name, product_id_for_log, len(new_matches), len(refurb_matches), retailer_count, tier,
             )
 
             sent = False
             if alert["notify_email"] and alert["email"]:
                 sent = send_email_notification(
-                    alert["email"], product["name"], refurb_matches, new_matches, retailer_results
+                    alert["email"], product_name, refurb_matches, new_matches, retailer_results
                 ) or sent
             if alert["notify_sms"] and alert["phone"]:
                 sent = send_sms_notification(
-                    alert["phone"], product["name"], refurb_matches, new_matches, retailer_results
+                    alert["phone"], product_name, refurb_matches, new_matches, retailer_results
                 ) or sent
 
             if sent:
@@ -1609,8 +1673,11 @@ def api_create_alert():
     notify_sms = bool(data.get("notify_sms", False))
     tier = data.get("tier", "free").strip().lower()
 
-    product = get_product_by_id(product_id)
-    if not product:
+    criteria_in = data.get("criteria") or {}
+    has_criteria = bool(criteria_in.get("search") or criteria_in.get("filters"))
+
+    product = get_product_by_id(product_id) if product_id else None
+    if not product and not has_criteria:
         return jsonify({"error": "Invalid product"}), 400
     if tier not in ("free", "pro", "ultra"):
         return jsonify({"error": "Invalid tier."}), 400
@@ -1629,35 +1696,49 @@ def api_create_alert():
     now = datetime.now(timezone.utc).isoformat()
     db = get_db()
 
-    # Check if product is currently available (new or refurbished)
-    refurbished = db.execute(
-        "SELECT * FROM refurbished_products WHERE category = ? AND available = 1",
-        (product["category"],),
-    ).fetchall()
-    refurb_matches = match_product_to_refurbished(product, [dict(r) for r in refurbished])
+    if product:
+        refurbished = db.execute(
+            "SELECT * FROM refurbished_products WHERE category = ? AND available = 1",
+            (product["category"],),
+        ).fetchall()
+        refurb_matches = match_product_to_refurbished(product, [dict(r) for r in refurbished])
 
-    new_rows = db.execute(
-        "SELECT * FROM new_products WHERE category = ? AND buyable = 1",
-        (product["category"],),
-    ).fetchall()
-    new_matches = match_product_to_new(product, [dict(r) for r in new_rows])
+        new_rows = db.execute(
+            "SELECT * FROM new_products WHERE category = ? AND buyable = 1",
+            (product["category"],),
+        ).fetchall()
+        new_matches = match_product_to_new(product, [dict(r) for r in new_rows])
 
-    retailer_results = search_all_retailers(product)
+        retailer_results = search_all_retailers(product)
+        watch_name = product["name"]
+        criteria_json = None
+    else:
+        refurb_rows = db.execute("SELECT * FROM refurbished_products WHERE available = 1").fetchall()
+        new_rows = db.execute("SELECT * FROM new_products WHERE buyable = 1").fetchall()
+        refurb_matches, new_matches, retailer_results = scan_inventory_by_criteria(
+            criteria_in,
+            [dict(r) for r in refurb_rows],
+            [dict(r) for r in new_rows],
+        )
+        watch_name = criteria_label(criteria_in)
+        criteria_json = json.dumps(criteria_in)
+        product_id = ""
+
     has_retailer_hits = any(rdata.get("listings") for rdata in retailer_results.values())
 
     if refurb_matches or new_matches or has_retailer_hits:
         db.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, user_id, created_at, notified_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, user_id, now, now))
+            INSERT INTO alerts (product_id, criteria, email, phone, notify_email, notify_sms, tier, user_id, created_at, notified_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """, (product_id, criteria_json, email, phone, int(notify_email), int(notify_sms), tier, user_id, now, now))
         db.commit()
 
         def _notify():
             if notify_email and email:
-                send_signup_confirmation(email, product["name"], tier, immediate_available=True)
-                send_email_notification(email, product["name"], refurb_matches, new_matches, retailer_results)
+                send_signup_confirmation(email, watch_name, tier, immediate_available=True)
+                send_email_notification(email, watch_name, refurb_matches, new_matches, retailer_results)
             if notify_sms and phone:
-                send_sms_notification(phone, product["name"], refurb_matches, new_matches, retailer_results)
+                send_sms_notification(phone, watch_name, refurb_matches, new_matches, retailer_results)
 
         threading.Thread(target=_notify, daemon=True).start()
 
@@ -1673,27 +1754,27 @@ def api_create_alert():
 
         return jsonify({
             "status": "available_now",
-            "message": f"{product['name']} is {', '.join(msg_parts)}! Sending notification...",
+            "message": f"{watch_name} is {', '.join(msg_parts)}! Sending notification...",
             "new_count": len(new_matches),
             "refurb_count": len(refurb_matches),
         })
     else:
         db.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier, user_id, created_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, user_id, now))
+            INSERT INTO alerts (product_id, criteria, email, phone, notify_email, notify_sms, tier, user_id, created_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (product_id, criteria_json, email, phone, int(notify_email), int(notify_sms), tier, user_id, now))
         db.commit()
 
         if notify_email and email:
             threading.Thread(
                 target=send_signup_confirmation,
-                args=(email, product["name"], tier, False),
+                args=(email, watch_name, tier, False),
                 daemon=True,
             ).start()
 
         return jsonify({
             "status": "watching",
-            "message": f"Alert set! We'll notify you when {product['name']} becomes available on the Apple Store.",
+            "message": f"Alert set! We'll notify you when {watch_name} becomes available.",
         })
 
 
@@ -1820,9 +1901,14 @@ def api_create_subscription():
     if notify_sms and not phone:
         return jsonify({"error": "Phone number required for SMS alerts."}), 400
 
-    product = get_product_by_id(product_id)
-    if not product:
+    criteria_in = data.get("criteria") or {}
+    has_criteria = bool(criteria_in.get("search") or criteria_in.get("filters"))
+    product = get_product_by_id(product_id) if product_id else None
+    if not product and not has_criteria:
         return jsonify({"error": "Invalid product."}), 400
+
+    watch_name = product["name"] if product else criteria_label(criteria_in)
+    criteria_json = None if product else json.dumps(criteria_in)
 
     price_id = STRIPE_PRICE_PRO if tier == "pro" else STRIPE_PRICE_ULTRA
     if not price_id:
@@ -1846,10 +1932,10 @@ def api_create_subscription():
 
         if subscription.status == "active":
             _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
-                               tier, customer.id, subscription.id, user_id)
+                               tier, customer.id, subscription.id, user_id, criteria_json)
             return jsonify({
                 "status": "active",
-                "message": f"Subscribed to {tier.title()} plan! Alert set for {product['name']}.",
+                "message": f"Subscribed to {tier.title()} plan! Alert set for {watch_name}.",
                 "subscription_id": subscription.id,
             })
 
@@ -1864,10 +1950,10 @@ def api_create_subscription():
 
         if pi and pi.status == "succeeded":
             _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
-                               tier, customer.id, subscription.id, user_id)
+                               tier, customer.id, subscription.id, user_id, criteria_json)
             return jsonify({
                 "status": "active",
-                "message": f"Subscribed to {tier.title()} plan! Alert set for {product['name']}.",
+                "message": f"Subscribed to {tier.title()} plan! Alert set for {watch_name}.",
                 "subscription_id": subscription.id,
             })
 
@@ -1896,13 +1982,17 @@ def api_confirm_subscription():
     notify_sms = bool(data.get("notify_sms", False))
     user_id = data.get("user_id", "")
 
+    criteria_in = data.get("criteria") or {}
+    has_criteria = bool(criteria_in.get("search") or criteria_in.get("filters"))
+    criteria_json = json.dumps(criteria_in) if has_criteria and not product_id else None
+
     try:
         sub = stripe.Subscription.retrieve(subscription_id)
         if sub.status == "active":
             _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
-                               tier, customer_id, subscription_id, user_id)
-            product = get_product_by_id(product_id)
-            name = product["name"] if product else "your product"
+                               tier, customer_id, subscription_id, user_id, criteria_json)
+            product = get_product_by_id(product_id) if product_id else None
+            name = product["name"] if product else (criteria_label(criteria_in) if has_criteria else "your product")
             return jsonify({
                 "status": "active",
                 "message": f"Subscribed to {tier.title()} plan! Alert set for {name}.",
@@ -1914,14 +2004,14 @@ def api_confirm_subscription():
 
 
 def _create_paid_alert(product_id, email, phone, notify_email, notify_sms,
-                       tier, customer_id, subscription_id, user_id=None):
+                       tier, customer_id, subscription_id, user_id=None, criteria_json=None):
     now = datetime.now(timezone.utc).isoformat()
     with get_db_connection() as conn:
         conn.execute("""
-            INSERT INTO alerts (product_id, email, phone, notify_email, notify_sms, tier,
+            INSERT INTO alerts (product_id, criteria, email, phone, notify_email, notify_sms, tier,
                               stripe_customer_id, stripe_subscription_id, user_id, created_at, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        """, (product_id, email, phone, int(notify_email), int(notify_sms), tier,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (product_id or "", criteria_json, email, phone, int(notify_email), int(notify_sms), tier,
               customer_id, subscription_id, user_id, now))
         conn.commit()
 

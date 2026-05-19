@@ -965,6 +965,17 @@
             color: var(--ink-muted);
         }
         .no-results h3 { margin-bottom: 8px; color: var(--ink); font-family: 'Fraunces', serif; }
+        .no-results p { margin: 0 auto 20px; max-width: 480px; line-height: 1.55; }
+        .no-results-cta {
+            display: inline-flex; align-items: center; gap: 10px;
+            background: var(--accent); color: white;
+            border: 2px solid var(--ink); border-radius: 0;
+            padding: 14px 24px; font-weight: 700; font-size: 15px;
+            cursor: pointer; box-shadow: 4px 4px 0 var(--ink);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .no-results-cta:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+        .no-results-cta:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
 
         .modal-overlay {
             display: none;
@@ -2288,6 +2299,7 @@
     let activeMemory = '';
     let activeFilters = [];
     let defaultView = true;
+    let pendingCriteria = null;   // {search, filters} when alert is criteria-only
 
     // Auth + payment state
     let currentUser = null;   // { user_id, email, display_name, phone }
@@ -2629,6 +2641,34 @@
         });
     }
 
+    function buildCriteriaLabel() {
+        var parts = [];
+        if (searchQuery) parts.push(searchQuery);
+        if (activeMemory) parts.push(activeMemory + 'GB');
+        activeFilters.forEach(function(f) { if (parts.indexOf(f) === -1) parts.push(f); });
+        return parts.join(' + ') || 'your criteria';
+    }
+
+    function buildCriteriaPayload() {
+        var filters = activeFilters.slice();
+        if (activeMemory && filters.indexOf(activeMemory + 'GB') === -1) filters.push(activeMemory + 'GB');
+        return { search: searchQuery || '', filters: filters };
+    }
+
+    function openCriteriaSignup() {
+        pendingCriteria = buildCriteriaPayload();
+        // Use a virtual product so signup overlay can render
+        selectedProduct = {
+            id: '',
+            name: buildCriteriaLabel(),
+            image: '',
+            subcategory: 'Watch criteria',
+            category: 'all',
+            year: '',
+        };
+        openSignup('free');
+    }
+
     function renderProducts() {
         var hasActiveSearch = !defaultView && (searchQuery || activeFilters.length > 0 || activeMemory);
         var filtered = allProducts.filter(function(p) {
@@ -2646,15 +2686,36 @@
         });
 
         var sabBar = document.getElementById('searchAlertBar');
-        if (hasActiveSearch && filtered.length > 0) {
-            document.getElementById('sabCount').textContent = filtered.length;
+        var sabCount = document.getElementById('sabCount');
+        var sabBtn = document.getElementById('sabAlertBtn');
+        if (hasActiveSearch) {
+            if (filtered.length > 0) {
+                sabCount.textContent = filtered.length + (filtered.length === 1 ? ' product matches' : ' products match');
+                sabBtn.textContent = 'Set Alert for This Search';
+            } else {
+                var crit = buildCriteriaLabel();
+                sabCount.textContent = 'No catalog match for "' + crit + '"';
+                sabBtn.textContent = 'Set Alert Anyway';
+            }
             sabBar.removeAttribute('hidden');
         } else {
             sabBar.setAttribute('hidden', '');
         }
 
         if (filtered.length === 0) {
-            productGrid.innerHTML = '<div class="no-results"><h3>No products found</h3><p>Try adjusting your search or category filter.</p></div>';
+            var critLabel = buildCriteriaLabel();
+            productGrid.innerHTML =
+                '<div class="no-results">' +
+                    '<h3>No catalog match for your filters</h3>' +
+                    '<p>You can still set an alert for <strong>' + escapeHtml(critLabel) + '</strong>. ' +
+                    'We\'ll scan every retailer and notify you the moment matching inventory appears.</p>' +
+                    '<button class="no-results-cta" id="emptyStateAlertBtn" type="button">' +
+                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+                        'Set Alert for "' + escapeHtml(critLabel) + '"' +
+                    '</button>' +
+                '</div>';
+            var btn = document.getElementById('emptyStateAlertBtn');
+            if (btn) btn.addEventListener('click', openCriteriaSignup);
             return;
         }
 
@@ -2691,6 +2752,7 @@
     async function openModal(productId) {
         selectedProduct = allProducts.find(function(p) { return p.id === productId; });
         if (!selectedProduct) return;
+        pendingCriteria = null;
 
         var catInfo = categories.find(function(c) { return c.id === selectedProduct.category; }) || {};
 
@@ -2992,7 +3054,29 @@
         results.sort(function(a, b) { return b.year - a.year || a.name.localeCompare(b.name); });
 
         if (results.length === 0) {
-            wizardResults.innerHTML = '<div class="wizard-no-results">No products match. Try a different search or adjust filters.</div>';
+            var critParts = [];
+            if (q) critParts.push(q);
+            wizFilters.forEach(function(f) { critParts.push(f); });
+            var critLabel = critParts.join(' + ') || 'your criteria';
+            wizardResults.innerHTML =
+                '<div class="wizard-no-results">' +
+                    '<p style="margin-bottom:16px;">No catalog match for <strong>' + escapeHtml(critLabel) + '</strong>.</p>' +
+                    '<p style="margin-bottom:20px;font-size:14px;">You can still set an alert. We\'ll scan every retailer and notify you the moment matching inventory appears.</p>' +
+                    '<button class="no-results-cta" id="wizCriteriaBtn" type="button">' +
+                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+                        'Set Alert for "' + escapeHtml(critLabel) + '"' +
+                    '</button>' +
+                '</div>';
+            var wcb = document.getElementById('wizCriteriaBtn');
+            if (wcb) wcb.addEventListener('click', function() {
+                pendingCriteria = { search: q, filters: wizFilters.slice() };
+                selectedProduct = {
+                    id: '', name: critLabel, image: '',
+                    subcategory: 'Watch criteria', category: 'all', year: '',
+                };
+                wizardOverlay.classList.remove('visible');
+                openSignup('free');
+            });
             return;
         }
 
@@ -3054,6 +3138,7 @@
 
     wizardCtaBtn.addEventListener('click', function() {
         if (!wizSelectedProduct || !wizSelectedTier) return;
+        pendingCriteria = null;
         selectedProduct = wizSelectedProduct;
         wizardOverlay.classList.remove('visible');
         openSignup(wizSelectedTier);
@@ -3094,8 +3179,17 @@
         selectedTier = tier;
 
         // Populate product row
-        document.getElementById('signupProductImg').src = selectedProduct.image;
-        document.getElementById('signupProductName').textContent = selectedProduct.name;
+        var imgEl = document.getElementById('signupProductImg');
+        if (selectedProduct.image) {
+            imgEl.src = selectedProduct.image;
+            imgEl.style.display = '';
+        } else {
+            imgEl.removeAttribute('src');
+            imgEl.style.display = 'none';
+        }
+        var nameLabel = selectedProduct.name;
+        if (pendingCriteria) nameLabel = 'Watch: ' + nameLabel;
+        document.getElementById('signupProductName').textContent = nameLabel;
 
         var tierInfo = { free: ['Free · 15 min · Email', '$0'], pro: ['Pro · 90 sec · Email + SMS', '$7/mo'], ultra: ['Ultra · 15 sec · Email + SMS', '$14/mo'] };
         var info = tierInfo[tier] || tierInfo.free;
@@ -3209,6 +3303,7 @@
 
     function closeSignup() {
         signupOverlay.classList.remove('visible');
+        pendingCriteria = null;
         if (cardElement) {
             cardElement.unmount();
             cardElement.destroy();
@@ -3388,7 +3483,8 @@
                         payment_method_id: pmResult.paymentMethod.id,
                         email: email,
                         phone: phone,
-                        product_id: selectedProduct.id,
+                        product_id: pendingCriteria ? '' : selectedProduct.id,
+                        criteria: pendingCriteria || undefined,
                         tier: selectedTier,
                         notify_email: wantEmail,
                         notify_sms: wantSms,
@@ -3421,7 +3517,8 @@
                         body: JSON.stringify({
                             subscription_id: subData.subscription_id,
                             customer_id: subData.customer_id,
-                            product_id: selectedProduct.id,
+                            product_id: pendingCriteria ? '' : selectedProduct.id,
+                            criteria: pendingCriteria || undefined,
                             email: email,
                             phone: phone,
                             tier: selectedTier,
@@ -3447,7 +3544,8 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        product_id: selectedProduct.id,
+                        product_id: pendingCriteria ? '' : selectedProduct.id,
+                        criteria: pendingCriteria || undefined,
                         email: email,
                         phone: phone,
                         notify_email: wantEmail,
