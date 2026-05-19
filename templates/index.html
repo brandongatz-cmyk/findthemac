@@ -321,6 +321,9 @@
             font-size: 14px;
         }
         .stat-modal-row:last-child { border-bottom: none; }
+        .smr-clickable { cursor: pointer; transition: background 0.12s; }
+        .smr-clickable:hover { background: var(--bg-deep); }
+        .smr-clickable:hover .smr-meta { color: var(--terracotta); }
         .stat-modal-row .smr-title {
             font-weight: 600;
             color: var(--ink);
@@ -2389,15 +2392,53 @@
 
         if (which === 'retailers') {
             title = 'Retailers we monitor';
-            sub = 'We watch every one of these for new, refurbished, and used inventory.';
+            sub = 'Click a retailer to see every Apple product we have cached from them right now.';
+            var byRet = latestStats.in_stock_by_retailer || {};
             latestStats.retailers.forEach(function(r) {
-                listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + r.category + '</span>' + escapeHtml(r.name) + '</div><div class="smr-meta">' + escapeHtml(r.interval_label) + '</div></div>';
+                var count = byRet[r.name] || 0;
+                listHtml += '<div class="stat-modal-row smr-clickable" data-retailer-id="' + escapeHtml(r.id) + '" data-retailer-name="' + escapeHtml(r.name) + '" data-retailer-home="' + escapeHtml(r.homepage || '') + '">' +
+                    '<div class="smr-title">' +
+                        '<span class="smr-tag">' + r.category + '</span>' +
+                        escapeHtml(r.name) +
+                        ' <span class="smr-meta" style="font-weight:500;">· ' + count + ' in stock</span>' +
+                    '</div>' +
+                    '<div class="smr-meta">' +
+                        '<a href="' + escapeHtml(r.homepage || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="color:var(--cobalt,var(--terracotta));text-decoration:none;border-bottom:1px solid currentColor;">Visit site &#8599;</a>' +
+                    '</div>' +
+                '</div>';
             });
+        } else if (which.indexOf('retailer:') === 0) {
+            var ridParts = which.split(':');
+            var rid = ridParts[1];
+            var rname = decodeURIComponent(ridParts[2] || '');
+            var rhome = decodeURIComponent(ridParts[3] || '');
+            title = rname;
+            sub = 'Apple products currently in stock at ' + rname + '.';
+            listHtml = '<div class="stat-modal-row" style="background:var(--bg-deep);"><button class="wizard-back-link" id="statBackToRetailers" type="button" style="margin:0;">&larr; All retailers</button>' +
+                (rhome ? '<a href="' + escapeHtml(rhome) + '" target="_blank" rel="noopener" style="margin-left:auto;color:var(--terracotta);text-decoration:none;font-weight:700;font-size:13px;">Visit site &#8599;</a>' : '') +
+                '</div>';
+            var items = latestStats.in_stock.filter(function(i) { return i.retailer_id === rid; });
+            if (items.length === 0) {
+                listHtml += '<div class="stat-modal-row"><div class="smr-title" style="text-align:center;width:100%;">No items cached yet — check back shortly.</div></div>';
+            } else {
+                items.slice(0, 200).forEach(function(item) {
+                    var meta = item.price ? '$' + item.price : 'See price';
+                    listHtml += '<div class="stat-modal-row"><div class="smr-title"><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div><div class="smr-meta">' + escapeHtml(meta) + '</div></div>';
+                });
+                if (items.length > 200) {
+                    footer = 'Showing first 200 of ' + items.length + ' from ' + rname + ' · Refreshes every 15 seconds.';
+                } else {
+                    footer = items.length + ' items from ' + rname + ' · Refreshes every 15 seconds.';
+                }
+            }
         } else if (which === 'intervals') {
             title = 'Check intervals by tier';
-            sub = 'Faster tiers check more retailers more often — first to know wins.';
+            sub = 'Faster tiers check more often. Click any tier to sign up right now.';
             latestStats.intervals.forEach(function(t) {
-                listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + escapeHtml(t.tier) + '</span></div><div class="smr-meta">' + escapeHtml(t.interval_label) + '</div></div>';
+                listHtml += '<div class="stat-modal-row smr-clickable" data-tier="' + escapeHtml(t.tier.toLowerCase()) + '">' +
+                    '<div class="smr-title"><span class="smr-tag">' + escapeHtml(t.tier) + '</span>' + escapeHtml(t.interval_label) + '</div>' +
+                    '<div class="smr-meta" style="color:var(--terracotta);font-weight:800;">Sign up &rarr;</div>' +
+                '</div>';
             });
         } else if (which === 'products') {
             title = 'Products in our catalog';
@@ -2436,6 +2477,28 @@
         document.getElementById('statModalList').innerHTML = listHtml;
         document.getElementById('statModalFooter').textContent = footer;
         document.getElementById('statModalOverlay').classList.add('visible');
+
+        var listEl = document.getElementById('statModalList');
+        listEl.querySelectorAll('[data-retailer-id]').forEach(function(row) {
+            row.addEventListener('click', function() {
+                var rid = row.dataset.retailerId;
+                var rname = row.dataset.retailerName || '';
+                var rhome = row.dataset.retailerHome || '';
+                openStatModal('retailer:' + rid + ':' + encodeURIComponent(rname) + ':' + encodeURIComponent(rhome));
+            });
+        });
+        var backBtn = document.getElementById('statBackToRetailers');
+        if (backBtn) {
+            backBtn.addEventListener('click', function() { openStatModal('retailers'); });
+        }
+        listEl.querySelectorAll('[data-tier]').forEach(function(row) {
+            row.addEventListener('click', function() {
+                var tier = row.dataset.tier;
+                closeStatModal();
+                openWizard();
+                wizSelectedTier = tier;
+            });
+        });
     }
 
     function initFirebase() {

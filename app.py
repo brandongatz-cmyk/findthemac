@@ -1389,14 +1389,19 @@ def api_stats():
 
     retailers = [
         {"id": "apple_new", "name": "Apple.com", "category": "New",
+         "homepage": "https://www.apple.com/shop/buy-mac",
          "interval_label": f"{CHECK_INTERVAL_FREE} min (Free) / {CHECK_INTERVAL_ULTRA}s (Ultra)"},
         {"id": "apple_refurb", "name": "Apple Certified Refurbished", "category": "Refurbished",
+         "homepage": "https://www.apple.com/shop/refurbished",
          "interval_label": f"{CHECK_INTERVAL_FREE} min (Free) / {CHECK_INTERVAL_ULTRA}s (Ultra)"},
         {"id": "bestbuy", "name": "Best Buy", "category": "New",
+         "homepage": "https://www.bestbuy.com/site/apple/c/cat10",
          "interval_label": "Cached every 5 min"},
         {"id": "bh", "name": "B&H Photo", "category": "New",
+         "homepage": "https://www.bhphotovideo.com/c/buy/Apple-Computers/ci/16966",
          "interval_label": "Cached every 5 min"},
         {"id": "swappa", "name": "Swappa", "category": "Used",
+         "homepage": "https://swappa.com/apple",
          "interval_label": "Cached every 5 min"},
     ]
 
@@ -1431,9 +1436,11 @@ def api_stats():
     refurb_rows = db.execute(
         "SELECT url, title, price, category FROM refurbished_products WHERE available = 1 LIMIT 200"
     ).fetchall()
-    in_stock = [{"retailer": "Apple.com", "title": r["title"], "url": r["url"], "price": None}
+    in_stock = [{"retailer_id": "apple_new", "retailer": "Apple.com",
+                 "title": r["title"], "url": r["url"], "price": None}
                 for r in new_rows]
-    in_stock += [{"retailer": "Apple Refurbished", "title": r["title"], "url": r["url"],
+    in_stock += [{"retailer_id": "apple_refurb", "retailer": "Apple Refurbished",
+                  "title": r["title"], "url": r["url"],
                   "price": r["price"], "category": r["category"]}
                  for r in refurb_rows]
 
@@ -1447,8 +1454,9 @@ def api_stats():
                 data = json.loads(row["data"])
                 listings = data.get("listings", [])
                 retailer_totals[label] = retailer_totals.get(label, 0) + len(listings)
-                for item in listings[:50]:
+                for item in listings[:100]:
                     in_stock.append({
+                        "retailer_id": row["retailer"],
                         "retailer": label,
                         "title": item.get("title", "Listing"),
                         "url": item.get("url", ""),
