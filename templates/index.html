@@ -2395,7 +2395,7 @@
             sub = 'Click a retailer to see every Apple product we have cached from them right now.';
             var byRet = latestStats.in_stock_by_retailer || {};
             latestStats.retailers.forEach(function(r) {
-                var count = byRet[r.name] || 0;
+                var count = byRet[r.id] || 0;
                 listHtml += '<div class="stat-modal-row smr-clickable" data-retailer-id="' + escapeHtml(r.id) + '" data-retailer-name="' + escapeHtml(r.name) + '" data-retailer-home="' + escapeHtml(r.homepage || '') + '">' +
                     '<div class="smr-title">' +
                         '<span class="smr-tag">' + r.category + '</span>' +
@@ -2450,7 +2450,7 @@
         } else if (which === 'instock') {
             title = 'In stock right now';
             sub = latestStats.in_stock_total + ' items currently available across all monitored retailers.';
-            var byRet = latestStats.in_stock_by_retailer || {};
+            var byRet = latestStats.in_stock_by_retailer_name || {};
             var breakdownKeys = Object.keys(byRet);
             if (breakdownKeys.length > 0) {
                 listHtml += '<div class="stat-modal-row" style="background:var(--bg-deep);font-weight:700;"><div class="smr-title">Source</div><div class="smr-meta">Items</div></div>';

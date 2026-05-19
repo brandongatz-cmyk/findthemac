@@ -1444,7 +1444,7 @@ def api_stats():
                   "price": r["price"], "category": r["category"]}
                  for r in refurb_rows]
 
-    retailer_totals = {"Best Buy": 0, "B&H Photo": 0, "Swappa": 0}
+    retailer_totals = {"bestbuy": 0, "bh": 0, "swappa": 0}
     try:
         retailer_rows = db.execute("SELECT retailer, data FROM retailer_cache").fetchall()
         retailer_label = {"bestbuy": "Best Buy", "bh": "B&H Photo", "swappa": "Swappa"}
@@ -1453,7 +1453,7 @@ def api_stats():
             try:
                 data = json.loads(row["data"])
                 listings = data.get("listings", [])
-                retailer_totals[label] = retailer_totals.get(label, 0) + len(listings)
+                retailer_totals[row["retailer"]] = retailer_totals.get(row["retailer"], 0) + len(listings)
                 for item in listings[:100]:
                     in_stock.append({
                         "retailer_id": row["retailer"],
@@ -1480,9 +1480,18 @@ def api_stats():
         "in_stock": in_stock,
         "in_stock_total": grand_total,
         "in_stock_by_retailer": {
+            "apple_new": new_total_count,
+            "apple_refurb": refurb_total_count,
+            "bestbuy": retailer_totals.get("bestbuy", 0),
+            "bh": retailer_totals.get("bh", 0),
+            "swappa": retailer_totals.get("swappa", 0),
+        },
+        "in_stock_by_retailer_name": {
             "Apple.com": new_total_count,
-            "Apple Refurbished": refurb_total_count,
-            **retailer_totals,
+            "Apple Certified Refurbished": refurb_total_count,
+            "Best Buy": retailer_totals.get("bestbuy", 0),
+            "B&H Photo": retailer_totals.get("bh", 0),
+            "Swappa": retailer_totals.get("swappa", 0),
         },
     })
 
