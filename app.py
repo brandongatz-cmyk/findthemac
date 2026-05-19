@@ -679,6 +679,68 @@ def match_product_to_new(product, new_products_list):
 # Notifications
 # ============================================================================
 
+def send_signup_confirmation(to_email, product_name, tier, immediate_available=False):
+    """Send a one-time confirmation email when a user sets up an alert."""
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USERNAME", "")
+    smtp_pass = os.getenv("SMTP_PASSWORD", "")
+    from_addr = os.getenv("EMAIL_FROM", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        logger.warning("SMTP not configured, skipping signup confirmation to %s", to_email)
+        return False
+
+    tier_label = {"free": "Free (every 15 minutes)",
+                  "pro": "Pro (every 90 seconds)",
+                  "ultra": "Ultra (every 15 seconds)"}.get(tier, tier)
+
+    status_line = ("We already found inventory and have sent you a buy-link in a separate alert email."
+                   if immediate_available
+                   else "We'll email you the moment it shows up in stock — new, refurbished, or used.")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Alert confirmed for {product_name} — FindTheMac"
+    msg["From"] = from_addr
+    msg["To"] = to_email
+
+    text_body = (
+        f"You're watching: {product_name}\n"
+        f"Plan: {tier_label}\n\n"
+        f"{status_line}\n\n"
+        f"— FindTheMac (https://findthemac.com)\n"
+    )
+
+    html_body = f"""\
+<html><body style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
+  <h1 style="font-size:24px;margin:0 0 16px;">Your alert is set <span style="color:#c44536;">✓</span></h1>
+  <p style="font-size:16px;line-height:1.5;">
+    You're watching <strong>{product_name}</strong>.<br>
+    Plan: <strong>{tier_label}</strong>
+  </p>
+  <p style="font-size:15px;line-height:1.6;color:#444;">{status_line}</p>
+  <hr style="border:none;border-top:1px solid #ddd;margin:24px 0;">
+  <p style="font-size:13px;color:#888;">
+    — <a href="https://findthemac.com" style="color:#c44536;">FindTheMac</a>
+  </p>
+</body></html>
+"""
+
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        logger.info("Sent signup confirmation to %s", to_email)
+        return True
+    except Exception as e:
+        logger.error("Failed to send signup confirmation to %s: %s", to_email, e)
+        return False
+
+
 def send_email_notification(to_email, product_name, refurb_matches, new_matches, retailer_results=None):
     """Send an email alert about available products across all sources."""
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -1592,6 +1654,7 @@ def api_create_alert():
 
         def _notify():
             if notify_email and email:
+                send_signup_confirmation(email, product["name"], tier, immediate_available=True)
                 send_email_notification(email, product["name"], refurb_matches, new_matches, retailer_results)
             if notify_sms and phone:
                 send_sms_notification(phone, product["name"], refurb_matches, new_matches, retailer_results)
@@ -1620,6 +1683,13 @@ def api_create_alert():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
         """, (product_id, email, phone, int(notify_email), int(notify_sms), tier, user_id, now))
         db.commit()
+
+        if notify_email and email:
+            threading.Thread(
+                target=send_signup_confirmation,
+                args=(email, product["name"], tier, False),
+                daemon=True,
+            ).start()
 
         return jsonify({
             "status": "watching",
