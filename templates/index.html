@@ -268,8 +268,96 @@
             min-width: 160px;
             padding: 18px 20px;
             border-right: 2px solid var(--ink);
+            position: relative;
+            transition: background 0.15s;
         }
         .stat:last-child { border-right: none; }
+        .stat-clickable {
+            cursor: pointer;
+        }
+        .stat-clickable::after {
+            content: "↗";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 14px;
+            color: var(--ink-muted);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .stat-clickable:hover {
+            background: var(--bg-deep);
+        }
+        .stat-clickable:hover::after { opacity: 1; }
+        .stat-live-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #22c55e;
+            margin-left: 6px;
+            vertical-align: middle;
+            animation: pulse-dot 1.5s infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .stat-modal-list {
+            max-height: 60vh;
+            overflow-y: auto;
+            border: 2px solid var(--ink);
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+        .stat-modal-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--ink);
+            gap: 12px;
+            font-size: 14px;
+        }
+        .stat-modal-row:last-child { border-bottom: none; }
+        .stat-modal-row .smr-title {
+            font-weight: 600;
+            color: var(--ink);
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .stat-modal-row .smr-title a {
+            color: var(--ink);
+            text-decoration: none;
+            border-bottom: 1px dashed var(--ink-muted);
+        }
+        .stat-modal-row .smr-title a:hover { color: var(--terracotta); border-color: var(--terracotta); }
+        .stat-modal-row .smr-meta {
+            font-size: 12px;
+            color: var(--ink-muted);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .stat-modal-row .smr-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 100px;
+            background: var(--terracotta);
+            color: var(--paper);
+            font-size: 11px;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+        .stat-modal-footer {
+            font-size: 12px;
+            color: var(--ink-muted);
+            text-align: center;
+            padding: 4px 0;
+        }
         .stat-num {
             font-family: 'Fraunces', Georgia, serif;
             font-size: 32px;
@@ -1607,19 +1695,19 @@
         Set Your First Alert — It's Free
     </a>
     <div class="stats-row">
-        <div class="stat">
-            <div class="stat-num">5</div>
+        <div class="stat stat-clickable" data-stat="retailers">
+            <div class="stat-num" id="statRetailers">—</div>
             <div class="stat-label">Retailers monitored</div>
         </div>
-        <div class="stat">
-            <div class="stat-num">15s</div>
+        <div class="stat stat-clickable" data-stat="intervals">
+            <div class="stat-num" id="statInterval">—</div>
             <div class="stat-label">Fastest check interval</div>
         </div>
-        <div class="stat">
-            <div class="stat-num">81</div>
+        <div class="stat stat-clickable" data-stat="products">
+            <div class="stat-num" id="statProducts">—</div>
             <div class="stat-label">Products tracked</div>
         </div>
-        <div class="stat">
+        <div class="stat stat-clickable" data-stat="instock">
             <div class="stat-num" id="statRefurb">—</div>
             <div class="stat-label">In stock right now</div>
         </div>
@@ -2011,6 +2099,20 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="statModalOverlay">
+    <div class="modal" id="statModal" style="max-width:560px;">
+        <div class="modal-header">
+            <h2 style="font-size:22px;" id="statModalTitle">Stat detail</h2>
+            <button class="modal-close" id="statModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="statModalSub" style="margin:0 0 16px;font-size:14px;color:var(--ink-soft);"></p>
+            <div class="stat-modal-list" id="statModalList"></div>
+            <div class="stat-modal-footer" id="statModalFooter"></div>
+        </div>
+    </div>
+</div>
+
 <div class="wizard-overlay" id="wizardOverlay">
     <div class="wizard-panel">
         <div class="wizard-header">
@@ -2237,9 +2339,94 @@
 
             initFirebase();
             initStripe();
+            initLiveStats();
         } catch (err) {
             productGrid.innerHTML = '<div class="no-results"><h3>Failed to load products</h3><p>Please refresh the page.</p></div>';
         }
+    }
+
+    var latestStats = null;
+
+    async function fetchAndRenderStats() {
+        try {
+            var [statsRes, sumRes] = await Promise.all([
+                fetch('/api/stats'),
+                fetch('/api/inventory/summary'),
+            ]);
+            var s = await statsRes.json();
+            var sum = await sumRes.json();
+            latestStats = s;
+            document.getElementById('statRetailers').textContent = s.retailer_count;
+            document.getElementById('statInterval').textContent = s.fastest_interval_label;
+            document.getElementById('statProducts').textContent = s.products_total;
+            document.getElementById('statRefurb').textContent = s.in_stock_total;
+            updateHeaderStats(sum);
+        } catch (e) { /* keep last good values */ }
+    }
+
+    function initLiveStats() {
+        fetchAndRenderStats();
+        setInterval(fetchAndRenderStats, 15000);
+
+        document.querySelectorAll('.stat-clickable').forEach(function(el) {
+            el.addEventListener('click', function() {
+                openStatModal(el.dataset.stat);
+            });
+        });
+        document.getElementById('statModalClose').addEventListener('click', closeStatModal);
+        document.getElementById('statModalOverlay').addEventListener('click', function(e) {
+            if (e.target.id === 'statModalOverlay') closeStatModal();
+        });
+    }
+
+    function closeStatModal() {
+        document.getElementById('statModalOverlay').classList.remove('visible');
+    }
+
+    function openStatModal(which) {
+        if (!latestStats) return;
+        var title = '', sub = '', listHtml = '', footer = 'Refreshes live every 15 seconds.';
+
+        if (which === 'retailers') {
+            title = 'Retailers we monitor';
+            sub = 'We watch every one of these for new, refurbished, and used inventory.';
+            latestStats.retailers.forEach(function(r) {
+                listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + r.category + '</span>' + escapeHtml(r.name) + '</div><div class="smr-meta">' + escapeHtml(r.interval_label) + '</div></div>';
+            });
+        } else if (which === 'intervals') {
+            title = 'Check intervals by tier';
+            sub = 'Faster tiers check more retailers more often — first to know wins.';
+            latestStats.intervals.forEach(function(t) {
+                listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + escapeHtml(t.tier) + '</span></div><div class="smr-meta">' + escapeHtml(t.interval_label) + '</div></div>';
+            });
+        } else if (which === 'products') {
+            title = 'Products in our catalog';
+            sub = 'Click any one in the grid below to set an alert.';
+            latestStats.products_breakdown.forEach(function(p) {
+                listHtml += '<div class="stat-modal-row"><div class="smr-title">' + escapeHtml(p.name) + '</div><div class="smr-meta">' + p.count + '</div></div>';
+            });
+            footer = 'Total: ' + latestStats.products_total + ' products tracked · Refreshes every 15 seconds.';
+        } else if (which === 'instock') {
+            title = 'In stock right now';
+            sub = latestStats.in_stock_total + ' items currently available across all monitored retailers.';
+            if (latestStats.in_stock.length === 0) {
+                listHtml = '<div class="stat-modal-row"><div class="smr-title" style="text-align:center;width:100%;">Nothing in stock right now — set an alert and we will notify you.</div></div>';
+            } else {
+                latestStats.in_stock.slice(0, 100).forEach(function(item) {
+                    var meta = item.price ? '$' + item.price : 'See price';
+                    listHtml += '<div class="stat-modal-row"><div class="smr-title"><span class="smr-tag">' + escapeHtml(item.retailer) + '</span><a href="' + item.url + '" target="_blank" rel="noopener">' + escapeHtml(item.title) + '</a></div><div class="smr-meta">' + escapeHtml(meta) + '</div></div>';
+                });
+                if (latestStats.in_stock.length > 100) {
+                    footer = 'Showing first 100 of ' + latestStats.in_stock.length + ' · Refreshes every 15 seconds.';
+                }
+            }
+        }
+
+        document.getElementById('statModalTitle').textContent = title;
+        document.getElementById('statModalSub').textContent = sub;
+        document.getElementById('statModalList').innerHTML = listHtml;
+        document.getElementById('statModalFooter').textContent = footer;
+        document.getElementById('statModalOverlay').classList.add('visible');
     }
 
     function initFirebase() {
@@ -2286,10 +2473,6 @@
             headerStats.innerHTML = parts.join(' &middot; ') + ' available now';
         } else {
             headerStats.textContent = 'Live monitoring · five retailers';
-        }
-        var refurbStat = document.getElementById('statRefurb');
-        if (refurbStat) {
-            refurbStat.textContent = (s.refurbished_total || 0) + (s.new_total || 0);
         }
     }
 

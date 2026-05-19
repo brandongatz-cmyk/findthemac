@@ -1382,6 +1382,67 @@ def api_inventory_summary():
     })
 
 
+@app.route("/api/stats")
+def api_stats():
+    """Live stats for the hero stat row plus detail data shown in click-through modals."""
+    db = get_db()
+
+    retailers = [
+        {"id": "apple_new", "name": "Apple.com", "category": "New",
+         "interval_label": f"{CHECK_INTERVAL_FREE} min (Free) / {CHECK_INTERVAL_ULTRA}s (Ultra)"},
+        {"id": "apple_refurb", "name": "Apple Certified Refurbished", "category": "Refurbished",
+         "interval_label": f"{CHECK_INTERVAL_FREE} min (Free) / {CHECK_INTERVAL_ULTRA}s (Ultra)"},
+        {"id": "bestbuy", "name": "Best Buy", "category": "New",
+         "interval_label": "Cached every 5 min"},
+        {"id": "bh", "name": "B&H Photo", "category": "New",
+         "interval_label": "Cached every 5 min"},
+        {"id": "swappa", "name": "Swappa", "category": "Used",
+         "interval_label": "Cached every 5 min"},
+    ]
+
+    intervals = [
+        {"tier": "Free", "interval_seconds": CHECK_INTERVAL_FREE * 60,
+         "interval_label": f"Every {CHECK_INTERVAL_FREE} minutes"},
+        {"tier": "Pro", "interval_seconds": CHECK_INTERVAL_PRO,
+         "interval_label": f"Every {CHECK_INTERVAL_PRO} seconds"},
+        {"tier": "Ultra", "interval_seconds": CHECK_INTERVAL_ULTRA,
+         "interval_label": f"Every {CHECK_INTERVAL_ULTRA} seconds"},
+    ]
+
+    cat_counts = {}
+    for p in PRODUCTS:
+        cat = p.get("subcategory") or p.get("category", "Other")
+        cat_counts[cat] = cat_counts.get(cat, 0) + 1
+    products_breakdown = sorted(
+        [{"name": k, "count": v} for k, v in cat_counts.items()],
+        key=lambda x: -x["count"]
+    )
+
+    new_rows = db.execute(
+        "SELECT url, title FROM new_products WHERE buyable = 1 LIMIT 200"
+    ).fetchall()
+    refurb_rows = db.execute(
+        "SELECT url, title, price, category FROM refurbished_products WHERE available = 1 LIMIT 200"
+    ).fetchall()
+    in_stock = [{"retailer": "Apple.com", "title": r["title"], "url": r["url"], "price": None}
+                for r in new_rows]
+    in_stock += [{"retailer": "Apple Refurbished", "title": r["title"], "url": r["url"],
+                  "price": r["price"], "category": r["category"]}
+                 for r in refurb_rows]
+
+    return jsonify({
+        "retailers": retailers,
+        "retailer_count": len(retailers),
+        "intervals": intervals,
+        "fastest_interval_seconds": CHECK_INTERVAL_ULTRA,
+        "fastest_interval_label": f"{CHECK_INTERVAL_ULTRA}s",
+        "products_total": len(PRODUCTS),
+        "products_breakdown": products_breakdown,
+        "in_stock": in_stock,
+        "in_stock_total": len(in_stock),
+    })
+
+
 @app.route("/api/alerts", methods=["POST"])
 def api_create_alert():
     data = request.get_json()
