@@ -968,7 +968,7 @@
         .no-results p { margin: 0 auto 20px; max-width: 480px; line-height: 1.55; }
         .no-results-cta {
             display: inline-flex; align-items: center; gap: 10px;
-            background: var(--accent); color: white;
+            background: var(--paper); color: var(--terracotta);
             border: 2px solid var(--ink); border-radius: 0;
             padding: 14px 24px; font-weight: 700; font-size: 15px;
             cursor: pointer; box-shadow: 4px 4px 0 var(--ink);
@@ -2642,17 +2642,37 @@
     }
 
     function buildCriteriaLabel() {
+        var seen = {};
         var parts = [];
-        if (searchQuery) parts.push(searchQuery);
-        if (activeMemory) parts.push(activeMemory + 'GB');
-        activeFilters.forEach(function(f) { if (parts.indexOf(f) === -1) parts.push(f); });
+        function add(v) {
+            if (!v) return;
+            var k = v.toLowerCase().replace(/\s+/g, '');
+            if (seen[k]) return;
+            seen[k] = true;
+            parts.push(v);
+        }
+        add(searchQuery);
+        if (activeMemory) add(activeMemory + 'GB');
+        activeFilters.forEach(add);
         return parts.join(' + ') || 'your criteria';
     }
 
     function buildCriteriaPayload() {
-        var filters = activeFilters.slice();
-        if (activeMemory && filters.indexOf(activeMemory + 'GB') === -1) filters.push(activeMemory + 'GB');
-        return { search: searchQuery || '', filters: filters };
+        var seen = {};
+        var filters = [];
+        function add(v) {
+            if (!v) return;
+            var k = v.toLowerCase().replace(/\s+/g, '');
+            if (seen[k]) return;
+            seen[k] = true;
+            filters.push(v);
+        }
+        activeFilters.forEach(add);
+        if (activeMemory) add(activeMemory + 'GB');
+        var search = searchQuery || '';
+        // Drop search if it's identical to a filter we already captured
+        if (search && seen[search.toLowerCase().replace(/\s+/g, '')]) search = '';
+        return { search: search, filters: filters };
     }
 
     function openCriteriaSignup() {
