@@ -2662,7 +2662,7 @@
             id: '',
             name: buildCriteriaLabel(),
             image: '',
-            subcategory: 'Watch criteria',
+            subcategory: 'Set alert for criteria',
             category: 'all',
             year: '',
         };
@@ -3072,7 +3072,7 @@
                 pendingCriteria = { search: q, filters: wizFilters.slice() };
                 selectedProduct = {
                     id: '', name: critLabel, image: '',
-                    subcategory: 'Watch criteria', category: 'all', year: '',
+                    subcategory: 'Set alert for criteria', category: 'all', year: '',
                 };
                 wizardOverlay.classList.remove('visible');
                 openSignup('free');
@@ -3188,7 +3188,7 @@
             imgEl.style.display = 'none';
         }
         var nameLabel = selectedProduct.name;
-        if (pendingCriteria) nameLabel = 'Watch: ' + nameLabel;
+        if (pendingCriteria) nameLabel = 'Set alert for: ' + nameLabel;
         document.getElementById('signupProductName').textContent = nameLabel;
 
         var tierInfo = { free: ['Free · 15 min · Email', '$0'], pro: ['Pro · 90 sec · Email + SMS', '$7/mo'], ultra: ['Ultra · 15 sec · Email + SMS', '$14/mo'] };
