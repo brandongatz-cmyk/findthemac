@@ -1033,16 +1033,39 @@
         }
 
         .not-available-msg {
-            background: var(--bg-deep);
+            background: var(--ink);
+            color: var(--bg);
             border: 2px solid var(--ink);
-            border-radius: 10px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 24px 20px;
             margin-bottom: 20px;
             text-align: center;
-            color: var(--ink-soft);
-            font-size: 14px;
+            font-size: 15px;
+            line-height: 1.6;
         }
-        .not-available-msg strong { color: var(--ink); }
+        .not-available-msg strong { color: var(--highlight); }
+        .not-available-msg .na-icon {
+            display: block;
+            margin: 0 auto 12px;
+        }
+        .not-available-msg .na-headline {
+            font-family: 'Fraunces', serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--bg);
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+        .not-available-msg .na-arrow {
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 22px;
+            animation: bounce 1s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(6px); }
+        }
 
         .alert-form h3 {
             font-family: 'Fraunces', serif;
@@ -1870,6 +1893,8 @@
                         <span class="tier-badge paid-badge">$14/mo</span>
                     </div>
                 </div>
+
+                <p id="tierHint" style="text-align:center;font-size:13px;color:var(--ink-muted);margin:10px 0 0;font-weight:500;">Tap a plan to set your alert</p>
             </div>
         </div>
     </div>
@@ -2421,10 +2446,23 @@
                 alertFormTitle.innerHTML = 'Available <span class="italic">now</span> — set an alert';
             } else {
                 modalAvailStatus.innerHTML =
-                    '<div class="not-available-msg">Not currently found across any stores we monitor.<br><strong>Pick a plan below</strong> and we\'ll notify you when it appears!</div>';
+                    '<div class="not-available-msg">' +
+                        '<svg class="na-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+                        '<div class="na-headline">Not in stock anywhere right now</div>' +
+                        'We checked Apple, Best Buy, B&amp;H, and Swappa.<br><strong>Set an alert below and we\'ll notify you the second it appears.</strong>' +
+                        '<div class="na-arrow">&#8595;</div>' +
+                    '</div>';
+                alertFormTitle.innerHTML = 'Get notified — <span class="italic">pick a plan</span>';
             }
         } catch (e) {
-            modalAvailStatus.innerHTML = '<div class="not-available-msg">Could not check availability. Pick a plan to be notified.</div>';
+            modalAvailStatus.innerHTML =
+                '<div class="not-available-msg">' +
+                    '<svg class="na-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+                    '<div class="na-headline">Could not check availability</div>' +
+                    '<strong>Set an alert below and we\'ll watch all 5 retailers for you.</strong>' +
+                    '<div class="na-arrow">&#8595;</div>' +
+                '</div>';
+            alertFormTitle.innerHTML = 'Get notified — <span class="italic">pick a plan</span>';
         }
     }
 
