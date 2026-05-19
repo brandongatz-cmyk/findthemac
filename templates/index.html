@@ -587,6 +587,45 @@
             box-shadow: 6px 6px 0 var(--terracotta);
         }
 
+        .search-alert-bar {
+            max-width: 1100px;
+            margin: 0 auto 18px;
+            padding: 0 24px;
+        }
+        .search-alert-bar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 20px;
+            background: var(--ink);
+            color: var(--bg);
+            border-radius: 12px;
+            flex-wrap: wrap;
+        }
+        .sab-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 500;
+        }
+        .sab-info strong { font-weight: 800; }
+        .sab-btn {
+            padding: 10px 22px;
+            border: 2px solid var(--bg);
+            border-radius: 100px;
+            background: var(--terracotta);
+            color: var(--paper);
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .sab-btn:hover { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
         .wizard-overlay {
             display: none;
             position: fixed;
@@ -1736,6 +1775,16 @@
     </div>
 </section>
 
+<div class="search-alert-bar" id="searchAlertBar" hidden>
+    <div class="search-alert-bar-inner">
+        <div class="sab-info">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span><strong id="sabCount">0</strong> products match your search</span>
+        </div>
+        <button class="sab-btn" id="sabAlertBtn" type="button">Set Alert for This Search</button>
+    </div>
+</div>
+
 <div class="product-grid" id="productGrid">
     <div class="loading">
         <div class="spinner"></div>
@@ -2238,6 +2287,7 @@
     }
 
     function renderProducts() {
+        var hasActiveSearch = !defaultView && (searchQuery || activeFilters.length > 0 || activeMemory);
         var filtered = allProducts.filter(function(p) {
             if (defaultView) {
                 return p.subcategory === 'Mac mini' || p.subcategory === 'Mac Studio';
@@ -2251,6 +2301,14 @@
             });
             return matchesCat && matchesSearch && matchesFilters;
         });
+
+        var sabBar = document.getElementById('searchAlertBar');
+        if (hasActiveSearch && filtered.length > 0) {
+            document.getElementById('sabCount').textContent = filtered.length;
+            sabBar.removeAttribute('hidden');
+        } else {
+            sabBar.setAttribute('hidden', '');
+        }
 
         if (filtered.length === 0) {
             productGrid.innerHTML = '<div class="no-results"><h3>No products found</h3><p>Try adjusting your search or category filter.</p></div>';
@@ -2643,6 +2701,27 @@
         selectedProduct = wizSelectedProduct;
         wizardOverlay.classList.remove('visible');
         openSignup(wizSelectedTier);
+    });
+
+    // ── Search Alert Bar → open wizard with current filters ─────────────
+
+    document.getElementById('sabAlertBtn').addEventListener('click', function() {
+        openWizard();
+        wizardSearch.value = searchQuery || '';
+        activeFilters.forEach(function(f) {
+            wizardFilterPanel.querySelectorAll('.wiz-chip').forEach(function(chip) {
+                if (chip.dataset.value === f && !chip.classList.contains('active')) {
+                    chip.classList.add('active');
+                    if (wizFilters.indexOf(f) === -1) wizFilters.push(f);
+                }
+            });
+        });
+        if (wizFilters.length > 0) {
+            wizardFilterPanel.classList.add('open');
+            wizardFiltersBtn.classList.add('active');
+        }
+        updateWizFilterCount();
+        renderWizardResults();
     });
 
     // ── Tier cards → open signup overlay ───────────────────────────────────
