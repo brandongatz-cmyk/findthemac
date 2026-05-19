@@ -542,6 +542,50 @@
             color: var(--ink-muted);
             font-weight: 500;
         }
+        .card-cta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 10px 0;
+            background: var(--ink);
+            color: var(--bg);
+            border: none;
+            border-radius: 8px;
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            pointer-events: none;
+            transition: background 0.15s;
+        }
+        .card-cta svg { flex-shrink: 0; }
+        .product-card:hover .card-cta { background: var(--terracotta); }
+
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 28px;
+            padding: 16px 36px;
+            border: 2px solid var(--ink);
+            border-radius: 100px;
+            background: var(--ink);
+            color: var(--bg);
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 4px 4px 0 var(--terracotta);
+            transition: transform 0.15s, box-shadow 0.15s;
+            text-decoration: none;
+            letter-spacing: -0.3px;
+        }
+        .hero-cta:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0 var(--terracotta);
+        }
 
         .no-results {
             grid-column: 1 / -1;
@@ -1255,6 +1299,10 @@
     <span class="eyebrow">Apple inventory radar</span>
     <h1>Stop refreshing. <br><span class="italic">We'll text you</span> when it's <span class="highlight">in stock.</span></h1>
     <p class="hero-sub">Set a watch on any Apple product. The moment it shows up <strong>new, refurbished, or used</strong> across Apple, Best Buy, B&amp;H, or Swappa — you'll know in <strong>15 seconds</strong>.</p>
+    <a class="hero-cta" href="#productGrid" onclick="document.getElementById('searchInput').focus();return false;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Set Your First Alert — It's Free
+    </a>
     <div class="stats-row">
         <div class="stat">
             <div class="stat-num">5</div>
@@ -1817,6 +1865,10 @@
                     '<div class="product-category">' + escapeHtml(product.subcategory) + '</div>' +
                     '<div class="product-name">' + escapeHtml(product.name) + '</div>' +
                     '<div class="product-year">' + product.year + '</div>' +
+                    '<div class="card-cta">' +
+                        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+                        'Notify Me' +
+                    '</div>' +
                 '</div>' +
             '</div>';
         });
