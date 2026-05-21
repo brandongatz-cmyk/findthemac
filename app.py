@@ -938,12 +938,17 @@ def send_sms_notification(to_phone, product_name, refurb_matches, new_matches, r
     if retailer_results is None:
         retailer_results = {}
 
-    sid = os.getenv("TWILIO_ACCOUNT_SID", "")
-    token = os.getenv("TWILIO_AUTH_TOKEN", "")
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
+    api_key = os.getenv("TWILIO_API_KEY_SID", "")
+    api_secret = os.getenv("TWILIO_API_KEY_SECRET", "")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
     from_num = os.getenv("TWILIO_FROM_NUMBER", "")
 
-    if not sid or not token or not from_num:
+    if not account_sid or not from_num:
         logger.warning("Twilio not configured, skipping SMS to %s", to_phone)
+        return False
+    if not api_key and not auth_token:
+        logger.warning("Twilio credentials missing (need API key or auth token), skipping SMS to %s", to_phone)
         return False
 
     body = f"FindTheMac: {product_name} is now available!\n"
@@ -961,7 +966,10 @@ def send_sms_notification(to_phone, product_name, refurb_matches, new_matches, r
 
     try:
         from twilio.rest import Client
-        client = Client(sid, token)
+        if api_key and api_secret:
+            client = Client(api_key, api_secret, account_sid)
+        else:
+            client = Client(account_sid, auth_token)
         client.messages.create(body=body, from_=from_num, to=to_phone)
         logger.info("SMS sent to %s for %s", to_phone, product_name)
         return True
